@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# A minimal instruction finetuning file based on the code in chapter 7
+# 根據第 7 章程式碼寫成的最精簡 instruction finetuning 檔案
 
 from functools import partial
 from importlib.metadata import version
@@ -19,7 +19,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-# Import from local files in this folder
+# 從這個資料夾的本機檔案匯入
 from gpt_download import download_and_load_gpt2
 from previous_chapters import (
     calc_loss_loader,
@@ -36,7 +36,7 @@ class InstructionDataset(Dataset):
     def __init__(self, data, tokenizer):
         self.data = data
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = []
         for entry in data:
             instruction_plus_input = format_input(entry)
@@ -60,28 +60,28 @@ def custom_collate_fn(
     allowed_max_length=None,
     device="cpu"
 ):
-    # Find the longest sequence in the batch
+    # 找出 batch 中最長的序列
     batch_max_length = max(len(item)+1 for item in batch)
 
-    # Pad and prepare inputs and targets
+    # padding 並準備輸入和 target
     inputs_lst, targets_lst = [], []
 
     for item in batch:
         new_item = item.copy()
-        # Add an <|endoftext|> token
+        # 加入 <|endoftext|> token
         new_item += [pad_token_id]
-        # Pad sequences to max_length
+        # 把序列 pad 到 max_length
         padded = new_item + [pad_token_id] * (batch_max_length - len(new_item))
-        inputs = torch.tensor(padded[:-1])  # Truncate the last token for inputs
-        targets = torch.tensor(padded[1:])  # Shift +1 to the right for targets
+        inputs = torch.tensor(padded[:-1])  # 輸入去掉最後一個 token
+        targets = torch.tensor(padded[1:])  # target 往右移 +1
 
-        # New: Replace all but the first padding tokens in targets by ignore_index
+        # 新增：把 target 中除了第一個以外的 padding token 都換成 ignore_index
         mask = targets == pad_token_id
         indices = torch.nonzero(mask).squeeze()
         if indices.numel() > 1:
             targets[indices[1:]] = ignore_index
 
-        # New: Optionally truncate to maximum sequence length
+        # 新增：可選擇截斷到最大序列長度
         if allowed_max_length is not None:
             inputs = inputs[:allowed_max_length]
             targets = targets[:allowed_max_length]
@@ -89,7 +89,7 @@ def custom_collate_fn(
         inputs_lst.append(inputs)
         targets_lst.append(targets)
 
-    # Convert list of inputs and targets to tensors and transfer to target device
+    # 把輸入和目標的 list 轉成 tensor 並移到目標裝置
     inputs_tensor = torch.stack(inputs_lst).to(device)
     targets_tensor = torch.stack(targets_lst).to(device)
 
@@ -125,19 +125,19 @@ def format_input(entry):
 def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
     fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    # Plot training and validation loss against epochs
+    # 畫出訓練和驗證 loss 隨 epoch 的變化
     ax1.plot(epochs_seen, train_losses, label="Training loss")
     ax1.plot(epochs_seen, val_losses, linestyle="-.", label="Validation loss")
     ax1.set_xlabel("Epochs")
     ax1.set_ylabel("Loss")
     ax1.legend(loc="upper right")
 
-    # Create a second x-axis for tokens seen
-    ax2 = ax1.twiny()  # Create a second x-axis that shares the same y-axis
-    ax2.plot(tokens_seen, train_losses, alpha=0)  # Invisible plot for aligning ticks
+    # 建立第二條 x 軸顯示看過的 token 數
+    ax2 = ax1.twiny()  # 建立共用同一條 y 軸的第二條 x 軸
+    ax2.plot(tokens_seen, train_losses, alpha=0)  # 用來對齊刻度的隱形圖
     ax2.set_xlabel("Tokens seen")
 
-    fig.tight_layout()  # Adjust layout to make room
+    fig.tight_layout()  # 調整排版留出空間
     plot_name = "loss-plot-standalone.pdf"
     print(f"Plot saved as {plot_name}")
     plt.savefig(plot_name)
@@ -146,35 +146,35 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
 
 def main(test_mode=False):
     #######################################
-    # Print package versions
+    # 印出套件版本
     #######################################
     print()
     pkgs = [
-        "matplotlib",  # Plotting library
+        "matplotlib",  # 畫圖函式庫
         "tiktoken",    # Tokenizer
-        "torch",       # Deep learning library
-        "tqdm",        # Progress bar
-        "tensorflow",  # For OpenAI's pretrained weights
+        "torch",       # 深度學習函式庫
+        "tqdm",        # 進度條
+        "tensorflow",  # 給 OpenAI 預訓練權重使用
     ]
     for p in pkgs:
         print(f"{p} version: {version(p)}")
     print(50*"-")
 
     #######################################
-    # Download and prepare dataset
+    # 下載並準備資料集
     #######################################
     file_path = "instruction-data.json"
     url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch07/01_main-chapter-code/instruction-data.json"
     data = download_and_load_file(file_path, url)
 
-    train_portion = int(len(data) * 0.85)  # 85% for training
-    test_portion = int(len(data) * 0.1)    # 10% for testing
+    train_portion = int(len(data) * 0.85)  # 85% 用於訓練
+    test_portion = int(len(data) * 0.1)    # 10% 用於測試
 
     train_data = data[:train_portion]
     test_data = data[train_portion:train_portion + test_portion]
     val_data = data[train_portion + test_portion:]
 
-    # Use very small subset for testing purposes
+    # 測試用，只取很小的子集
     if test_mode:
         train_data = train_data[:10]
         val_data = val_data[:10]
@@ -218,10 +218,10 @@ def main(test_mode=False):
     )
 
     #######################################
-    # Load pretrained model
+    # 載入預訓練模型
     #######################################
 
-    # Small GPT model for testing purposes
+    # 測試用的小型 GPT 模型
     if args.test_mode:
         BASE_CONFIG = {
             "vocab_size": 50257,
@@ -237,13 +237,13 @@ def main(test_mode=False):
         device = "cpu"
         CHOOSE_MODEL = "Small test model"
 
-    # Code as it is used in the main chapter
+    # 主章節中使用的程式碼
     else:
         BASE_CONFIG = {
-            "vocab_size": 50257,     # Vocabulary size
+            "vocab_size": 50257,     # 詞彙表大小
             "context_length": 1024,  # Context length
-            "drop_rate": 0.0,        # Dropout rate
-            "qkv_bias": True         # Query-key-value bias
+            "drop_rate": 0.0,        # Dropout 比例
+            "qkv_bias": True         # Query-key-value 的 bias
         }
 
         model_configs = {
@@ -269,7 +269,7 @@ def main(test_mode=False):
     print(50*"-")
 
     #######################################
-    # Finetuning the model
+    # 微調模型
     #######################################
     print("Initial losses")
     with torch.no_grad():
@@ -300,7 +300,7 @@ def main(test_mode=False):
     print(50*"-")
 
     #######################################
-    # Saving results
+    # 儲存結果
     #######################################
     print("Generating responses")
     for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
@@ -321,7 +321,7 @@ def main(test_mode=False):
 
     test_data_path = "instruction-data-with-response-standalone.json"
     with open(test_data_path, "w") as file:
-        json.dump(test_data, file, indent=4)  # "indent" for pretty-printing
+        json.dump(test_data, file, indent=4)  # "indent" 用來美化輸出格式
     print(f"Responses saved as {test_data_path}")
 
     file_name = f"{re.sub(r'[ ()]', '', CHOOSE_MODEL) }-sft-standalone.pth"

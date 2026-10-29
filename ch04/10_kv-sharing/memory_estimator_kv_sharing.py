@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# KV-cache memory estimator for MHA, GQA, and cross-layer KV sharing.
+# MHA、GQA 與跨層 KV sharing 的 KV-cache 記憶體估算。
 
 import argparse
 import math

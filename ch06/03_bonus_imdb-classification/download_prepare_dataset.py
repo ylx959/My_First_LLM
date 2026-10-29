@@ -49,34 +49,34 @@ def download_and_extract_dataset(dataset_url, target_file, directory):
 
 
 def load_dataset_to_dataframe(basepath="aclImdb", labels={"pos": 1, "neg": 0}):
-    data_frames = []  # List to store each chunk of DataFrame
+    data_frames = []  # 存放每個 DataFrame 區塊的 list
     for subset in ("test", "train"):
         for label in ("pos", "neg"):
             path = os.path.join(basepath, subset, label)
             for file in sorted(os.listdir(path)):
                 with open(os.path.join(path, file), "r", encoding="utf-8") as infile:
-                    # Create a DataFrame for each file and add it to the list
+                    # 為每個檔案建立 DataFrame 並加入 list
                     data_frames.append(pd.DataFrame({"text": [infile.read()], "label": [labels[label]]}))
-    # Concatenate all DataFrame chunks together
+    # 把所有 DataFrame 區塊串接起來
     df = pd.concat(data_frames, ignore_index=True)
-    df = df.sample(frac=1, random_state=123).reset_index(drop=True)  # Shuffle the DataFrame
+    df = df.sample(frac=1, random_state=123).reset_index(drop=True)  # 打亂 DataFrame
     return df
 
 
 def partition_and_save(df, sizes=(35000, 5000, 10000)):
-    # Shuffle the DataFrame
+    # 打亂 DataFrame
     df_shuffled = df.sample(frac=1, random_state=123).reset_index(drop=True)
 
-    # Get indices for where to split the data
+    # 取得切分資料的 index
     train_end = sizes[0]
     val_end = sizes[0] + sizes[1]
 
-    # Split the DataFrame
+    # 切分 DataFrame
     train = df_shuffled.iloc[:train_end]
     val = df_shuffled.iloc[train_end:val_end]
     test = df_shuffled.iloc[val_end:]
 
-    # Save to CSV files
+    # 存成 CSV 檔
     train.to_csv("train.csv", index=False)
     val.to_csv("validation.csv", index=False)
     test.to_csv("test.csv", index=False)

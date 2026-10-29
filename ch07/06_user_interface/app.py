@@ -11,7 +11,7 @@ import torch
 import chainlit
 
 
-# For llms_from_scratch installation instructions, see:
+# llms_from_scratch 的安裝說明請見：
 # https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
 from llms_from_scratch.ch04 import GPTModel
 from llms_from_scratch.ch05 import (
@@ -30,13 +30,13 @@ def get_model_and_tokenizer():
     """
 
     GPT_CONFIG_355M = {
-        "vocab_size": 50257,     # Vocabulary size
-        "context_length": 1024,  # Shortened context length (orig: 1024)
-        "emb_dim": 1024,         # Embedding dimension
-        "n_heads": 16,           # Number of attention heads
-        "n_layers": 24,          # Number of layers
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "vocab_size": 50257,     # 詞彙表大小
+        "context_length": 1024,  # 縮短的 context length（原本：1024）
+        "emb_dim": 1024,         # Embedding 維度
+        "n_heads": 16,           # Attention head 數
+        "n_layers": 24,          # 層數
+        "drop_rate": 0.0,        # Dropout 比例
+        "qkv_bias": True         # Query-key-value 的 bias
     }
 
     tokenizer = tiktoken.get_encoding("gpt2")
@@ -61,7 +61,7 @@ def extract_response(response_text, input_text):
     return response_text[len(input_text):].replace("### Response:", "").strip()
 
 
-# Obtain the necessary tokenizer and model files for the chainlit function below
+# 取得下面 chainlit 函式需要的 tokenizer 和模型檔案
 tokenizer, model, model_config = get_model_and_tokenizer()
 
 
@@ -80,9 +80,9 @@ async def main(message: chainlit.Message):
     {message.content}
     """
 
-    token_ids = generate(  # function uses `with torch.no_grad()` internally already
+    token_ids = generate(  # 函式內部已經用了 `with torch.no_grad()`
         model=model,
-        idx=text_to_token_ids(prompt, tokenizer).to(device),  # The user text is provided via as `message.content`
+        idx=text_to_token_ids(prompt, tokenizer).to(device),  # 使用者的文字透過 `message.content` 提供
         max_new_tokens=35,
         context_size=model_config["context_length"],
         eos_id=50256
@@ -92,5 +92,5 @@ async def main(message: chainlit.Message):
     response = extract_response(text, prompt)
 
     await chainlit.Message(
-        content=f"{response}",  # This returns the model response to the interface
+        content=f"{response}",  # 把模型回應傳回介面
     ).send()

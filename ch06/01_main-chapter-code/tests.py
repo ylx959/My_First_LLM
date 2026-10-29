@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# File for internal use (unit tests)
+# 內部使用的檔案（unit test）
 
 
 import subprocess

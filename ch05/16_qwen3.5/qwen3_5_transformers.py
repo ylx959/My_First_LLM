@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# Notebook shims for optional fast kernels in transformers
+# 為 transformers 中可選的快速 kernel 所做的 notebook 墊片
 causal_conv1d_fn = None
 causal_conv1d_update = None
 chunk_gated_delta_rule = None
@@ -36,7 +36,7 @@ class _NotebookLogger:
 logger = _NotebookLogger()
 
 
-# Placeholder types for copied annotations
+# 複製過來的型別標註所用的佔位型別
 class Qwen3_5Config:
     pass
 
@@ -55,7 +55,7 @@ class Qwen3_5RMSNormGated(nn.Module):
         input_dtype = hidden_states.dtype
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        # Norm before gate
+        # gate 之前先做 norm
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         hidden_states = self.weight * hidden_states.to(input_dtype)
         hidden_states = hidden_states * F.silu(gate.to(torch.float32))
@@ -67,7 +67,7 @@ def apply_mask_to_padding_states(hidden_states, attention_mask):
     """
     Tunes out the hidden states for padding tokens, see https://github.com/state-spaces/mamba/issues/66
     """
-    # NOTE: attention mask is a 2D boolean tensor
+    # 注意：attention mask 是 2D 的布林 tensor
     if attention_mask is not None and attention_mask.shape[1] > 1 and attention_mask.shape[0] > 1:
         dtype = hidden_states.dtype
         hidden_states = (hidden_states * attention_mask[:, :, None]).to(dtype)
@@ -132,14 +132,14 @@ def torch_chunk_gated_delta_rule(
 
     v_beta = value * beta.unsqueeze(-1)
     k_beta = key * beta.unsqueeze(-1)
-    # reshape to chunks
+    # reshape 成 chunk
     query, key, value, k_beta, v_beta = [
         x.reshape(x.shape[0], x.shape[1], -1, chunk_size, x.shape[-1]) for x in (query, key, value, k_beta, v_beta)
     ]
     g = g.reshape(g.shape[0], g.shape[1], -1, chunk_size)
     mask = torch.triu(torch.ones(chunk_size, chunk_size, dtype=torch.bool, device=query.device), diagonal=0)
 
-    # chunk decay
+    # chunk 衰減
     g = g.cumsum(dim=-1)
     decay_mask = ((g.unsqueeze(-1) - g.unsqueeze(-2)).tril().exp().float()).tril()
     attn = -((k_beta @ key.transpose(-1, -2)) * decay_mask).masked_fill(mask, 0)
@@ -158,7 +158,7 @@ def torch_chunk_gated_delta_rule(
     core_attn_out = torch.zeros_like(value)
     mask = torch.triu(torch.ones(chunk_size, chunk_size, dtype=torch.bool, device=query.device), diagonal=1)
 
-    # for each chunk
+    # 對每個 chunk
     for i in range(0, total_sequence_length // chunk_size):
         q_i, k_i, v_i = query[:, :, i], key[:, :, i], value[:, :, i]
         attn = (q_i @ k_i.transpose(-1, -2) * decay_mask[:, :, i]).masked_fill_(mask, 0)
@@ -221,8 +221,8 @@ def torch_recurrent_gated_delta_rule(
     return core_attn_out, last_recurrent_state
 
 
-# Minimal change: enforce config dtype at the end to avoid bf16/fp32 matmul mismatch
-# in a mixed notebook implementation
+# 最小改動：最後強制使用 config 的 dtype，避免 bf16/fp32 矩陣乘法不一致
+# 在混合的 notebook 實作中
 class Qwen3_5GatedDeltaNet(nn.Module):
     def __init__(self, config, layer_idx):
         super().__init__()
@@ -251,8 +251,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
             padding=self.conv_kernel_size - 1,
         )
 
-        # time step projection (discretization)
-        # instantiate once and copy inv_dt in init_weights of PretrainedModel
+        # 時間步投影（離散化）
+        # 建立一次，並在 PretrainedModel 的 init_weights 中複製 inv_dt
         self.dt_bias = nn.Parameter(torch.ones(self.num_v_heads))
 
         A = torch.empty(self.num_v_heads).uniform_(0, 16)
@@ -289,7 +289,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         self.in_proj_b = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
         self.in_proj_a = nn.Linear(self.hidden_size, self.num_v_heads, bias=False)
 
-        # Notebook adaptation for dtype consistency.
+        # 為了 dtype 一致性所做的 notebook 調整。
         if config.dtype is not None:
             self.to(dtype=config.dtype)
 
@@ -302,7 +302,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
     ):
         hidden_states = apply_mask_to_padding_states(hidden_states, attention_mask)
 
-        # Set up dimensions for reshapes later
+        # 設定之後 reshape 要用的維度
         batch_size, seq_len, _ = hidden_states.shape
 
         use_precomputed_states = (
@@ -312,7 +312,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
             and cache_position is not None
         )
 
-        # getting projected states from cache if it exists
+        # 如果 cache 中有投影過的狀態就直接取用
         if cache_params is not None:
             conv_state = cache_params.conv_states[self.layer_idx]
             recurrent_state = cache_params.recurrent_states[self.layer_idx]
@@ -327,8 +327,8 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         a = self.in_proj_a(hidden_states)
 
         if use_precomputed_states:
-            # 2. Convolution sequence transformation
-            # NOTE: the conv state is updated in `causal_conv1d_update`
+            # 2. 卷積序列轉換
+            # 注意：conv state 在 `causal_conv1d_update` 中更新
             mixed_qkv = self.causal_conv1d_update(
                 mixed_qkv,
                 conv_state,
@@ -367,7 +367,7 @@ class Qwen3_5GatedDeltaNet(nn.Module):
         value = value.reshape(batch_size, seq_len, -1, self.head_v_dim)
 
         beta = b.sigmoid()
-        # If the model is loaded in fp16, without the .float() here, A might be -inf
+        # 如果模型以 fp16 載入，這裡不加 .float() 的話 A 可能會變成 -inf
         g = -self.A_log.float().exp() * F.softplus(a.float() + self.dt_bias)
         if self.num_v_heads // self.num_k_heads > 1:
             query = query.repeat_interleave(self.num_v_heads // self.num_k_heads, dim=2)
@@ -397,11 +397,11 @@ class Qwen3_5GatedDeltaNet(nn.Module):
                 use_qk_l2norm_in_kernel=True,
             )
 
-        # Update cache
+        # 更新 cache
         if cache_params is not None:
             cache_params.recurrent_states[self.layer_idx] = last_recurrent_state
 
-        # reshape input data into 2D tensor
+        # 把輸入資料 reshape 成 2D tensor
         core_attn_out = core_attn_out.reshape(-1, self.head_v_dim)
         z = z.reshape(-1, self.head_v_dim)
         core_attn_out = self.norm(core_attn_out, z)

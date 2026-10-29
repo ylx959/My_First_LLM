@@ -1,4 +1,4 @@
-# Code to test the GPT model implementation against the KV cache variants
+# 把 GPT 模型實作和 KV cache 版本互相比對的測試程式碼
 
 import pytest
 import torch
@@ -21,7 +21,7 @@ GPT_CONFIG_124M = {
     "n_layers": 12,
     "drop_rate": 0.1,
     "qkv_bias": False,
-    "kv_window_size": 1024  # NEW: KV cache window size
+    "kv_window_size": 1024  # 新增：KV cache 的 window 大小
 }
 
 
@@ -121,13 +121,13 @@ def test_context_overflow_bug():
     """
     GPT_CONFIG_SMALL = {
         "vocab_size": 50257,
-        "context_length": 10,  # Very small context
+        "context_length": 10,  # 非常小的 context
         "emb_dim": 768,
         "n_heads": 12,
         "n_layers": 12,
         "drop_rate": 0.1,
         "qkv_bias": False,
-        "kv_window_size": 20  # Larger than context_length
+        "kv_window_size": 20  # 大於 context_length
     }
 
     torch.manual_seed(123)
@@ -135,13 +135,13 @@ def test_context_overflow_bug():
     model = GPTModelKV2(GPT_CONFIG_SMALL).to(device)
     model.eval()
 
-    # 5 input tokens
+    # 5 個輸入 token
     input_tokens = torch.randint(0, 50257, (1, 5), device=device)
 
     generate_text_simple_cachedKV2(
         model=model,
         idx=input_tokens,
-        max_new_tokens=10,  # 5 + 10 = 15 > 10 context_length
+        max_new_tokens=10,  # 5 + 10 = 15 > context_length 的 10
         context_size=GPT_CONFIG_SMALL["context_length"],
         use_cache=True
     )
@@ -164,17 +164,17 @@ def test_prefill_chunking_basic():
         "n_layers": 12,
         "drop_rate": 0.1,
         "qkv_bias": False,
-        "kv_window_size": 4  # Small window to force chunking
+        "kv_window_size": 4  # 用小 window 強制分段
     }
 
     torch.manual_seed(123)
     model = GPTModelKV2(config).to(device)
     model.eval()
 
-    # 10 input tokens (> kv_window_size of 4)
+    # 10 個輸入 token（> kv_window_size 的 4）
     input_tokens = torch.randint(0, 50257, (1, 10), device=device)
 
-    # Should successfully process all input in chunks
+    # 應該能分段成功處理所有輸入
     token_ids = generate_text_simple_cachedKV2(
         model=model,
         idx=input_tokens,
@@ -182,8 +182,8 @@ def test_prefill_chunking_basic():
         use_cache=True
     )
 
-    # Should have 10 input + 2 generated = 12 total
+    # 應該有 10 個輸入 + 2 個生成 = 共 12 個
     assert token_ids.shape[1] == 12, f"Expected 12 tokens, got {token_ids.shape[1]}"
 
-    # First 10 tokens should match input
+    # 前 10 個 token 應該和輸入相同
     assert torch.equal(token_ids[:, :10], input_tokens), "Input tokens should be preserved"

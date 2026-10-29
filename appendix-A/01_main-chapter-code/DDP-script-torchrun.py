@@ -3,13 +3,13 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# Appendix A: Introduction to PyTorch (Part 3)
+# 附錄 A：PyTorch 入門（第 3 部分）
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-# NEW imports:
+# 新增的 import：
 import os
 import platform
 from torch.utils.data.distributed import DistributedSampler
@@ -17,29 +17,29 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 
-# NEW: function to initialize a distributed process group (1 process / GPU)
-# this allows communication among processes
+# 新增：初始化分散式 process group 的函式（每張 GPU 1 個 process）
+# 這讓 process 之間可以互相溝通
 def ddp_setup(rank, world_size):
     """
     Arguments:
         rank: a unique process ID
         world_size: total number of processes in the group
     """
-    # Only set MASTER_ADDR and MASTER_PORT if not already defined by torchrun
+    # 只有在 torchrun 尚未設定時才設定 MASTER_ADDR 和 MASTER_PORT
     if "MASTER_ADDR" not in os.environ:
         os.environ["MASTER_ADDR"] = "localhost"
     if "MASTER_PORT" not in os.environ:
         os.environ["MASTER_PORT"] = "12345"
 
-    # initialize process group
+    # 初始化 process group
     if platform.system() == "Windows":
-        # Disable libuv because PyTorch for Windows isn't built with support
+        # 關閉 libuv，因為 Windows 版 PyTorch 沒有編譯這項支援
         os.environ["USE_LIBUV"] = "0"
-        # Windows users may have to use "gloo" instead of "nccl" as backend
-        # gloo: Facebook Collective Communication Library
+        # Windows 使用者可能需要用 "gloo" 而不是 "nccl" 作為 backend
+        # gloo：Facebook Collective Communication Library
         init_process_group(backend="gloo", rank=rank, world_size=world_size)
     else:
-        # nccl: NVIDIA Collective Communication Library
+        # nccl：NVIDIA Collective Communication Library
         init_process_group(backend="nccl", rank=rank, world_size=world_size)
 
     torch.cuda.set_device(rank)
@@ -64,15 +64,15 @@ class NeuralNetwork(torch.nn.Module):
         super().__init__()
 
         self.layers = torch.nn.Sequential(
-            # 1st hidden layer
+            # 第 1 個隱藏層
             torch.nn.Linear(num_inputs, 30),
             torch.nn.ReLU(),
 
-            # 2nd hidden layer
+            # 第 2 個隱藏層
             torch.nn.Linear(30, 20),
             torch.nn.ReLU(),
 
-            # output layer
+            # 輸出層
             torch.nn.Linear(20, num_outputs),
         )
 
@@ -97,7 +97,7 @@ def prepare_dataset():
     ])
     y_test = torch.tensor([0, 1])
 
-    # Uncomment these lines to increase the dataset size to run this script on up to 8 GPUs:
+    # 取消註解這幾行來增加資料集大小，讓這個腳本可以在最多 8 張 GPU 上執行：
     # factor = 4
     # X_train = torch.cat([X_train + torch.randn_like(X_train) * 0.1 for _ in range(factor)])
     # y_train = y_train.repeat(factor)
@@ -110,11 +110,11 @@ def prepare_dataset():
     train_loader = DataLoader(
         dataset=train_ds,
         batch_size=2,
-        shuffle=False,  # NEW: False because of DistributedSampler below
+        shuffle=False,  # 新增：設為 False，因為下面用了 DistributedSampler
         pin_memory=True,
         drop_last=True,
-        # NEW: chunk batches across GPUs without overlapping samples:
-        sampler=DistributedSampler(train_ds)  # NEW
+        # 新增：把 batch 分配到各 GPU，樣本不重疊：
+        sampler=DistributedSampler(train_ds)  # 新增
     )
     test_loader = DataLoader(
         dataset=test_ds,
@@ -124,35 +124,35 @@ def prepare_dataset():
     return train_loader, test_loader
 
 
-# NEW: wrapper
+# 新增：包裝函式
 def main(rank, world_size, num_epochs):
 
-    ddp_setup(rank, world_size)  # NEW: initialize process groups
+    ddp_setup(rank, world_size)  # 新增：初始化 process group
 
     train_loader, test_loader = prepare_dataset()
     model = NeuralNetwork(num_inputs=2, num_outputs=2)
     model.to(rank)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.5)
 
-    model = DDP(model, device_ids=[rank])  # NEW: wrap model with DDP
-    # the core model is now accessible as model.module
+    model = DDP(model, device_ids=[rank])  # 新增：用 DDP 包裝模型
+    # 核心模型現在可以透過 model.module 存取
 
     for epoch in range(num_epochs):
-        # NEW: Set sampler to ensure each epoch has a different shuffle order
+        # 新增：設定 sampler，確保每個 epoch 的打亂順序都不同
         train_loader.sampler.set_epoch(epoch)
 
         model.train()
         for features, labels in train_loader:
 
-            features, labels = features.to(rank), labels.to(rank)  # New: use rank
+            features, labels = features.to(rank), labels.to(rank)  # 新增：使用 rank
             logits = model(features)
-            loss = F.cross_entropy(logits, labels)  # Loss function
+            loss = F.cross_entropy(logits, labels)  # Loss 函式
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # LOGGING
+            # 記錄
             print(f"[GPU{rank}] Epoch: {epoch+1:03d}/{num_epochs:03d}"
                   f" | Batchsize {labels.shape[0]:03d}"
                   f" | Train/Val Loss: {loss:.2f}")
@@ -166,7 +166,7 @@ def main(rank, world_size, num_epochs):
         print(f"[GPU{rank}] Test accuracy", test_acc)
 
     ####################################################
-    # NEW (not in the book):
+    # 新增（書中沒有）：
     except ZeroDivisionError as e:
         raise ZeroDivisionError(
             f"{e}\n\nThis script is designed for 2 GPUs. You can run it as:\n"
@@ -175,7 +175,7 @@ def main(rank, world_size, num_epochs):
         )
     ####################################################
 
-    destroy_process_group()  # NEW: cleanly exit distributed mode
+    destroy_process_group()  # 新增：乾淨地結束分散式模式
 
 
 def compute_accuracy(model, dataloader, device):
@@ -196,7 +196,7 @@ def compute_accuracy(model, dataloader, device):
 
 
 if __name__ == "__main__":
-    # NEW: Use environment variables set by torchrun if available, otherwise default to single-process.
+    # 新增：有 torchrun 設定的環境變數就使用，否則預設為單一 process。
     if "WORLD_SIZE" in os.environ:
         world_size = int(os.environ["WORLD_SIZE"])
     else:
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     else:
         rank = 0
 
-    # Only print on rank 0 to avoid duplicate prints from each GPU process
+    # 只在 rank 0 印出，避免每個 GPU process 重複印
     if rank == 0:
         print("PyTorch version:", torch.__version__)
         print("CUDA available:", torch.cuda.is_available())

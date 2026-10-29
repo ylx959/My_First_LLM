@@ -6,7 +6,7 @@
 import torch
 import chainlit
 
-# For llms_from_scratch installation instructions, see:
+# llms_from_scratch 的安裝說明請見：
 # https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
 from llms_from_scratch.kv_cache.qwen3 import (
     Qwen3Model,
@@ -19,13 +19,13 @@ from llms_from_scratch.kv_cache.generate import (
 )
 
 # ============================================================
-# EDIT ME: Simple configuration
+# 請修改這裡：簡單設定
 # ============================================================
-MODEL = "0.6B"            # options: "0.6B","1.7B","4B","8B","14B","32B","30B-A3B"
-REASONING = True          # True = "thinking" chat model, False = Base
+MODEL = "0.6B"            # 選項："0.6B"、"1.7B"、"4B"、"8B"、"14B"、"32B"、"30B-A3B"
+REASONING = True          # True = "thinking" chat 模型，False = Base
 DEVICE = "auto"           # "auto" | "cuda" | "mps" | "cpu"
 MAX_NEW_TOKENS = 38912
-LOCAL_DIR = None          # e.g., "Qwen3-0.6B-Base"; None auto-selects
+LOCAL_DIR = None          # 例如 "Qwen3-0.6B-Base"；None 代表自動選擇
 # ============================================================
 
 
@@ -81,7 +81,7 @@ def get_model_and_tokenizer(qwen3_config, repo_id, local_dir, device, use_reason
     load_weights_into_qwen(model, qwen3_config, weights_dict)
     del weights_dict
 
-    model.to(device)  # safe for all but required by the MoE model
+    model.to(device)  # 對所有模型都安全，但 MoE 模型必須要有
     model.eval()
 
     tok_filename = "tokenizer.json"
@@ -114,15 +114,15 @@ async def main(message: chainlit.Message):
     """
     The main Chainlit function.
     """
-    # 1) Encode input
+    # 1) 編碼輸入
     input_ids = TOKENIZER.encode(message.content)
     input_ids_tensor = torch.tensor(input_ids, device=DEVICE).unsqueeze(0)
 
-    # 2) Start an outgoing message we can stream into
+    # 2) 建立一則可以串流寫入的輸出訊息
     out_msg = chainlit.Message(content="")
     await out_msg.send()
 
-    # 3) Stream generation
+    # 3) 串流生成
     for tok in generate_text_simple_stream(
         model=MODEL,
         token_ids=input_ids_tensor,
@@ -133,5 +133,5 @@ async def main(message: chainlit.Message):
         piece = TOKENIZER.decode(token_id.tolist())
         await out_msg.stream_token(piece)
 
-    # 4) Finalize the streamed message
+    # 4) 完成串流訊息
     await out_msg.update()

@@ -21,9 +21,9 @@ from gpt_download import download_and_load_gpt2
 from previous_chapters import GPTModel, load_weights_into_gpt
 
 
-# If the `previous_chapters.py` file is not available locally,
-# you can import it from the `llms-from-scratch` PyPI package.
-# For details, see: https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
+# 如果本機沒有 `previous_chapters.py` 檔案，
+# 你可以從 `llms-from-scratch` PyPI 套件匯入。
+# 詳見：https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
 # E.g.,
 # from llms_from_scratch.ch04 import GPTModel
 # from llms_from_scratch.ch05 import download_and_load_gpt2, load_weights_into_gpt
@@ -54,7 +54,7 @@ class LinearWithLoRA(torch.nn.Module):
         return self.linear(x) + self.lora(x)
 
 
-# This LoRA code is equivalent to LinearWithLoRA
+# 這段 LoRA 程式碼等同於 LinearWithLoRA
 class LinearWithLoRAMerged(torch.nn.Module):
     def __init__(self, linear, rank, alpha):
         super().__init__()
@@ -74,14 +74,14 @@ class SpamDataset(Dataset):
         self.data = pd.read_csv(csv_file)
         self.max_length = max_length if max_length is not None else self._longest_encoded_length(tokenizer)
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = [
             tokenizer.encode(text)[:self.max_length]
             for text in self.data["Text"]
         ]
 
         if not no_padding:
-            # Pad sequences to the longest sequence
+            # 把序列 pad 到最長序列的長度
             self.encoded_texts = [
                 et + [pad_token_id] * (self.max_length - len(et))
                 for et in self.encoded_texts
@@ -102,8 +102,8 @@ class SpamDataset(Dataset):
             if encoded_length > max_length:
                 max_length = encoded_length
         return max_length
-        # Note: A more pythonic version to implement this method
-        # is the following, which is also used in the next chapter:
+        # 注意：這個方法更 pythonic 的寫法
+        # 如下，下一章也會用到：
         # return max(len(encoded_text) for encoded_text in self.encoded_texts)
 
 
@@ -112,7 +112,7 @@ def download_and_unzip(url, zip_path, extract_to, new_file_path):
         print(f"{new_file_path} already exists. Skipping download and extraction.")
         return
 
-    # Downloading the file
+    # 下載檔案中
     response = requests.get(url, stream=True, timeout=60)
     response.raise_for_status()
     with open(zip_path, "wb") as out_file:
@@ -120,25 +120,25 @@ def download_and_unzip(url, zip_path, extract_to, new_file_path):
             if chunk:
                 out_file.write(chunk)
 
-    # Unzipping the file
+    # 解壓縮檔案
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extract_to)
 
-    # Renaming the file to indicate its format
+    # 重新命名檔案以標示格式
     original_file = Path(extract_to) / "SMSSpamCollection"
     os.rename(original_file, new_file_path)
     print(f"File downloaded and saved as {new_file_path}")
 
 
 def random_split(df, train_frac, val_frac):
-    # Shuffle the entire DataFrame
+    # 打亂整個 DataFrame
     df = df.sample(frac=1, random_state=123).reset_index(drop=True)
 
-    # Calculate split indices
+    # 計算切分的 index
     train_end = int(len(df) * train_frac)
     val_end = train_end + int(len(df) * val_frac)
 
-    # Split the DataFrame
+    # 切分 DataFrame
     train_df = df[:train_end]
     val_df = df[train_end:val_end]
     test_df = df[val_end:]
@@ -149,14 +149,14 @@ def random_split(df, train_frac, val_frac):
 def create_dataset_csvs(new_file_path):
     df = pd.read_csv(new_file_path, sep="\t", header=None, names=["Label", "Text"])
 
-    # Create balanced dataset
+    # 建立平衡的資料集
     n_spam = df[df["Label"] == "spam"].shape[0]
     ham_sampled = df[df["Label"] == "ham"].sample(n_spam, random_state=123)
     balanced_df = pd.concat([ham_sampled, df[df["Label"] == "spam"]])
     balanced_df = balanced_df.sample(frac=1, random_state=123).reset_index(drop=True)
     balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1})
 
-    # Sample and save csv files
+    # 抽樣並儲存 csv 檔
     train_df, val_df, test_df = random_split(balanced_df, 0.7, 0.1)
     train_df.to_csv("train.csv", index=None)
     val_df.to_csv("validation.csv", index=None)
@@ -166,10 +166,10 @@ def create_dataset_csvs(new_file_path):
 def instantiate_model(choose_model, load_weights):
 
     BASE_CONFIG = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,     # 詞彙表大小
         "context_length": 1024,  # Context length
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "drop_rate": 0.0,        # Dropout 比例
+        "qkv_bias": True         # Query-key-value 的 bias
     }
 
     model_configs = {
@@ -198,17 +198,17 @@ def calc_loss_batch(input_batch, target_batch, model, device,
                     trainable_token_pos=-1, ignore_index=-100, average_embeddings=False):
     input_batch, target_batch = input_batch.to(device), target_batch.to(device)
 
-    if trainable_token_pos == "flexible":  # Selects the last tokens before the padding tokens
-        # From https://github.com/rasbt/LLMs-from-scratch/discussions/434
-        # Find the last non-padding token for each sequence in the batch
-        pad_token_id = 50256  # <|endoftext|> token used for padding
+    if trainable_token_pos == "flexible":  # 選出 padding token 之前的最後一個 token
+        # 出自 https://github.com/rasbt/LLMs-from-scratch/discussions/434
+        # 找出 batch 中每個序列最後一個非 padding 的 token
+        pad_token_id = 50256  # 用 <|endoftext|> token 做 padding
         mask = input_batch != pad_token_id
-        last_token_pos = mask.sum(dim=1) - 1  # Get position of last real token
+        last_token_pos = mask.sum(dim=1) - 1  # 取得最後一個真實 token 的位置
 
-        # Get model outputs
-        logits = model(input_batch)  # shape: [batch_size, seq_len, num_classes]
+        # 取得模型輸出
+        logits = model(input_batch)  # shape：[batch_size, seq_len, num_classes]
 
-        # Select the logits corresponding to the last real token of each sequence
+        # 選出每個序列最後一個真實 token 對應的 logits
         batch_size = logits.size(0)
         selected_logits = logits[torch.arange(batch_size), last_token_pos]
 
@@ -218,10 +218,10 @@ def calc_loss_batch(input_batch, target_batch, model, device,
     else:
         model_output = model(input_batch)
         if average_embeddings:
-            # Average over the sequence dimension (dim=1)
+            # 對序列維度（dim=1）取平均
             logits = model_output.mean(dim=1)
         else:
-            # Select embeddings at the specified token position
+            # 選出指定 token 位置的 embedding
             logits = model_output[:, trainable_token_pos, :]
 
         loss = torch.nn.functional.cross_entropy(logits, target_batch, ignore_index=ignore_index)
@@ -237,8 +237,8 @@ def calc_loss_loader(data_loader, model, device,
     elif num_batches is None:
         num_batches = len(data_loader)
     else:
-        # Reduce the number of batches to match the total number of batches in the data loader
-        # if num_batches exceeds the number of batches in the data loader
+        # 減少 batch 數以符合 data loader 中的總 batch 數
+        # 如果 num_batches 超過 data loader 中的 batch 數
         num_batches = min(num_batches, len(data_loader))
     for i, (input_batch, target_batch) in enumerate(data_loader):
         if i < num_batches:
@@ -253,7 +253,7 @@ def calc_loss_loader(data_loader, model, device,
     return total_loss / num_batches
 
 
-@torch.no_grad()  # Disable gradient tracking for efficiency
+@torch.no_grad()  # 關閉梯度追蹤以提升效率
 def calc_accuracy_loader(data_loader, model, device, num_batches=None,
                          trainable_token_pos=-1, average_embeddings=False):
     model.eval()
@@ -269,13 +269,13 @@ def calc_accuracy_loader(data_loader, model, device, num_batches=None,
             if i < num_batches:
                 input_batch, target_batch = input_batch.to(device), target_batch.to(device)
 
-                # Find the last non-padding token for each sequence in the batch
-                pad_token_id = 50256  # <|endoftext|> token used for padding
+                # 找出 batch 中每個序列最後一個非 padding 的 token
+                pad_token_id = 50256  # 用 <|endoftext|> token 做 padding
                 mask = input_batch != pad_token_id
-                last_token_pos = mask.sum(dim=1) - 1  # Get position of last real token
+                last_token_pos = mask.sum(dim=1) - 1  # 取得最後一個真實 token 的位置
 
-                logits = model(input_batch)  # Logits of last output token
-                # Select the logits corresponding to the last real token of each sequence
+                logits = model(input_batch)  # 最後一個輸出 token 的 logits
+                # 選出每個序列最後一個真實 token 對應的 logits
                 batch_size = logits.size(0)
                 selected_logits = logits[torch.arange(batch_size), last_token_pos]
                 predicted_labels = torch.argmax(selected_logits, dim=-1)
@@ -292,10 +292,10 @@ def calc_accuracy_loader(data_loader, model, device, num_batches=None,
 
                 model_output = model(input_batch)
                 if average_embeddings:
-                    # Average over the sequence dimension (dim=1)
+                    # 對序列維度（dim=1）取平均
                     logits = model_output.mean(dim=1)
                 else:
-                    # Select embeddings at the specified token position
+                    # 選出指定 token 位置的 embedding
                     logits = model_output[:, trainable_token_pos, :]
 
                 predicted_labels = torch.argmax(logits, dim=-1)
@@ -329,13 +329,13 @@ def evaluate_model(model, train_loader, val_loader, device,
 def train_classifier_simple(model, train_loader, val_loader, optimizer, device, num_epochs,
                             eval_freq, eval_iter, max_steps=None, trainable_token_pos=-1,
                             accumulation_steps=1, ignore_index=-100, average_embeddings=False):
-    # Initialize lists to track losses and tokens seen
+    # 初始化記錄 loss 和看過 token 數的 list
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
     examples_seen, global_step = 0, -1
 
-    # Main training loop
+    # 主要訓練迴圈
     for epoch in range(num_epochs):
-        model.train()  # Set model to training mode
+        model.train()  # 把模型設為訓練模式
 
         for batch_idx, (input_batch, target_batch) in enumerate(train_loader):
             loss = calc_loss_batch(
@@ -344,23 +344,23 @@ def train_classifier_simple(model, train_loader, val_loader, optimizer, device, 
                 average_embeddings=average_embeddings
             )
 
-            # Use gradient accumulation if accumulation_steps > 1
+            # accumulation_steps > 1 時使用梯度累積
             # See https://sebastianraschka.com/blog/2023/llm-grad-accumulation.html
-            # for an explanation
+            # 的說明
             loss /= accumulation_steps
 
-            loss.backward()  # Calculate loss gradients
+            loss.backward()  # 計算 loss 的梯度
 
-            # Use gradient accumulation if accumulation_steps > 1
+            # accumulation_steps > 1 時使用梯度累積
             is_update_step = ((batch_idx + 1) % accumulation_steps == 0) or ((batch_idx + 1) == len(train_loader))
             if is_update_step:
-                optimizer.step()  # Update model weights using loss gradients
-                optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
+                optimizer.step()  # 用 loss 梯度更新模型權重
+                optimizer.zero_grad()  # 清掉上一個 batch 迭代的 loss 梯度
 
-            examples_seen += input_batch.shape[0]  # New: track examples instead of tokens
+            examples_seen += input_batch.shape[0]  # 新增：記錄樣本數而不是 token 數
             global_step += 1
 
-            # Optional evaluation step
+            # 可選的評估步驟
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader, device, eval_iter,
@@ -375,7 +375,7 @@ def train_classifier_simple(model, train_loader, val_loader, optimizer, device, 
             if max_steps is not None and global_step > max_steps:
                 break
 
-        # New: Calculate accuracy after each epoch
+        # 新增：每個 epoch 結束後計算準確率
         train_accuracy = calc_accuracy_loader(
             train_loader, model, device, num_batches=eval_iter,
             trainable_token_pos=trainable_token_pos, average_embeddings=average_embeddings
@@ -398,13 +398,13 @@ def train_classifier_simple(model, train_loader, val_loader, optimizer, device, 
 def replace_linear_with_lora(model, rank, alpha, alternative=False):
     for name, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
-            # Replace the Linear layer with LinearWithLoRA
+            # 把 Linear 層換成 LinearWithLoRA
             if alternative:
                 setattr(model, name, LinearWithLoRAMerged(module, rank, alpha))
             else:
                 setattr(model, name, LinearWithLoRA(module, rank, alpha))
         else:
-            # Recursively apply the same function to child modules
+            # 遞迴地對子 module 套用同一個函式
             replace_linear_with_lora(module, rank, alpha)
 
 
@@ -538,15 +538,15 @@ if __name__ == "__main__":
         args.trainable_token_pos = 0
     elif args.trainable_token_pos == "last":
         args.trainable_token_pos = -1
-    # The "flexible" setting selects the last tokens before the padding tokens
-    # See https://github.com/rasbt/LLMs-from-scratch/discussions/434
+    # "flexible" 設定會選出 padding token 之前的最後一個 token
+    # 請見 https://github.com/rasbt/LLMs-from-scratch/discussions/434
     elif args.trainable_token_pos == "flexible":
         args.trainable_token_pos = "flexible"
     else:
         raise ValueError("Invalid --trainable_token_pos argument")
 
     ###############################
-    # Load model
+    # 載入模型
     ###############################
 
     if args.weights == "pretrained":
@@ -600,7 +600,7 @@ if __name__ == "__main__":
     model.to(device)
 
     ###############################
-    # Instantiate dataloaders
+    # 建立 dataloader
     ###############################
 
     url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
@@ -676,7 +676,7 @@ if __name__ == "__main__":
     )
 
     ###############################
-    # Train model
+    # 訓練模型
     ###############################
 
     start_time = time.time()
@@ -695,7 +695,7 @@ if __name__ == "__main__":
     print(f"Training completed in {execution_time_minutes:.2f} minutes.")
 
     ###############################
-    # Evaluate model
+    # 評估模型
     ###############################
 
     train_accuracy = calc_accuracy_loader(

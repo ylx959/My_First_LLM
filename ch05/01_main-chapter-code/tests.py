@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# File for internal use (unit tests)
+# 內部使用的檔案（unit test）
 
 import pytest
 from gpt_train import main
@@ -13,10 +13,10 @@ import requests
 def gpt_config():
     return {
         "vocab_size": 50257,
-        "context_length": 12,  # small for testing efficiency
-        "emb_dim": 32,         # small for testing efficiency
-        "n_heads": 4,          # small for testing efficiency
-        "n_layers": 2,         # small for testing efficiency
+        "context_length": 12,  # 為了測試效率設小一點
+        "emb_dim": 32,         # 為了測試效率設小一點
+        "n_heads": 4,          # 為了測試效率設小一點
+        "n_layers": 2,         # 為了測試效率設小一點
         "drop_rate": 0.1,
         "qkv_bias": False
     }
@@ -26,7 +26,7 @@ def gpt_config():
 def other_settings():
     return {
         "learning_rate": 5e-4,
-        "num_epochs": 1,    # small for testing efficiency
+        "num_epochs": 1,    # 為了測試效率設小一點
         "batch_size": 2,
         "weight_decay": 0.1
     }

@@ -64,7 +64,7 @@ def test_rejected_decode_preserves_cache_and_last_valid_position(model_setup):
     with pytest.raises(ValueError, match=r"Sequence length 9 exceeds .*8 tokens"):
         cached_forward(model, cache, tokens[:, -2:])
 
-    # Rejection must leave the previous prefix usable, including the last position.
+    # 拒絕之後，之前的前綴必須仍可使用，包括最後一個位置。
     actual = cached_forward(model, cache, tokens[:, -1:])
     expected = model(tokens)[:, -1:]
     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-5)
@@ -73,7 +73,7 @@ def test_rejected_decode_preserves_cache_and_last_valid_position(model_setup):
 @torch.inference_mode()
 @pytest.mark.parametrize("model_setup", ["qwen3_batched"], indirect=True)
 def test_batched_limit_checks_every_sample(model_setup):
-    # A later batch item can exceed the limit even when the first one fits.
+    # 即使第一個符合限制，後面的 batch 項目仍可能超過。
     model, cache = model_setup
     device = model.tok_emb.weight.device
     with pytest.raises(ValueError, match=r"Sequence length 9 exceeds .*8 tokens"):
@@ -85,7 +85,7 @@ def test_batched_limit_checks_every_sample(model_setup):
 @pytest.mark.parametrize("model_setup", ["gpt2", "llama3", "qwen3", "qwen3_moe"], indirect=True)
 def test_large_generation_budget_can_stop_early_at_eos(model_setup):
     model, _ = model_setup
-    model.out_head.weight.zero_()  # Make the next token EOS (token 0).
+    model.out_head.weight.zero_()  # 讓下一個 token 變成 EOS（token 0）。
     prompt = torch.tensor([[1, 2]], device=model.tok_emb.weight.device)
     output = list(generate_text_simple_stream(model, prompt, max_new_tokens=16, eos_token_id=0))
     assert output == []

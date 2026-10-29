@@ -3,65 +3,65 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# This file collects all the relevant code that we covered thus far
-# throughout Chapters 2-4.
-# This file can be run as a standalone script.
+# 這個檔案收集了到目前為止所有相關的程式碼
+# （第 2-4 章）。
+# 這個檔案可以當作獨立腳本執行。
 
 import torch
 
 
 #####################################
-# Chapter 5
+# 第 5 章
 #####################################
 def text_to_token_ids(text, tokenizer):
     encoded = tokenizer.encode(text)
-    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # add batch dimension
+    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # 加上 batch 維度
     return encoded_tensor
 
 
 def token_ids_to_text(token_ids, tokenizer):
-    flat = token_ids.squeeze(0)  # remove batch dimension
+    flat = token_ids.squeeze(0)  # 移除 batch 維度
     return tokenizer.decode(flat.tolist())
 
 
 def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=None, eos_id=None):
 
-    # For-loop is the same as before: Get logits, and only focus on last time step
+    # for 迴圈和之前一樣：取得 logits，只看最後一個時間步
     for _ in range(max_new_tokens):
         idx_cond = idx[:, -context_size:]
         with torch.no_grad():
             logits = model(idx_cond)
         logits = logits[:, -1, :]
 
-        # New: Filter logits with top_k sampling
+        # 新增：用 top_k sampling 過濾 logits
         if top_k is not None:
-            # Keep only top_k values
+            # 只保留 top_k 個值
             top_logits, _ = torch.topk(logits, top_k)
             min_val = top_logits[:, -1]
             logits = torch.where(logits < min_val, torch.tensor(float("-inf")).to(logits.device), logits)
 
-        # New: Apply temperature scaling
+        # 新增：套用 temperature 縮放
         if temperature > 0.0:
             logits = logits / temperature
 
-            # New (not in book): numerical stability tip to get equivalent results on mps device
-            # subtract rowwise max before softmax
+            # 新增（書中沒有）：數值穩定性的小技巧，讓 mps 裝置得到相同的結果
+            # softmax 之前先減掉每列的最大值
             logits = logits - logits.max(dim=-1, keepdim=True).values
 
-            # Apply softmax to get probabilities
+            # 套用 softmax 得到機率
             probs = torch.softmax(logits, dim=-1)  # (batch_size, context_len)
 
-            # Sample from the distribution
+            # 從分佈中取樣
             idx_next = torch.multinomial(probs, num_samples=1)  # (batch_size, 1)
 
-        # Otherwise same as before: get idx of the vocab entry with the highest logits value
+        # 其他和之前一樣：取得 logits 值最高的詞彙 index
         else:
             idx_next = torch.argmax(logits, dim=-1, keepdim=True)  # (batch_size, 1)
 
-        if idx_next == eos_id:  # Stop generating early if end-of-sequence token is encountered and eos_id is specified
+        if idx_next == eos_id:  # 如果遇到 end-of-sequence token 且有指定 eos_id，就提早停止生成
             break
 
-        # Same as before: append sampled index to the running sequence
+        # 和之前一樣：把取樣到的 index 接到目前的序列後面
         idx = torch.cat((idx, idx_next), dim=1)  # (batch_size, num_tokens+1)
 
     return idx

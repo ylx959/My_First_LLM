@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# KV-cache memory estimator for MHA vs GQA with SWA.
+# MHA 與 GQA 搭配 SWA 的 KV-cache 記憶體估算。
 
 import argparse
 import math
@@ -28,7 +28,7 @@ def calc_kv_bytes_per_layer(batch, context_length, head_dim, n_kv_heads, bytes_p
 
 
 def parse_ratio(ratio_str):
-    # "--swa_ratio a:b" means a SWA layers for every b full layers within a block
+    # "--swa_ratio a:b" 表示每個 block 中，每 b 個 full attention 層搭配 a 個 SWA 層
     try:
         a_str, b_str = ratio_str.split(":")
         a, b = int(a_str), int(b_str)
@@ -63,13 +63,13 @@ def estimate_totals(context_length, sliding_window_size, emb_dim, n_heads, n_lay
     eff_W = min(context_length, sliding_window_size)
     L = context_length
 
-    # Per-layer costs
+    # 每層的成本
     per_mha_full = calc_kv_bytes_per_layer(batch_size, L, head_dim, n_kv_heads_mha, bytes_per_elem)
     per_gqa_full = calc_kv_bytes_per_layer(batch_size, L, head_dim, n_kv_heads_gqa, bytes_per_elem)
     per_mha_swa = calc_kv_bytes_per_layer(batch_size, eff_W, head_dim, n_kv_heads_mha, bytes_per_elem)
     per_gqa_swa = calc_kv_bytes_per_layer(batch_size, eff_W, head_dim, n_kv_heads_gqa, bytes_per_elem)
 
-    # Totals
+    # 總計
     total_mha_allfull = per_mha_full * n_layers
     total_gqa_allfull = per_gqa_full * n_layers
     total_mixed_mha = n_swa_layers * per_mha_swa + n_full_layers * per_mha_full

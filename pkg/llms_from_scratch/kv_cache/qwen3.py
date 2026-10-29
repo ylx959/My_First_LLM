@@ -20,16 +20,16 @@ class Qwen3Model(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # Main model parameters
+        # 主要模型參數
         self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"], dtype=cfg["dtype"])
 
-        self.trf_blocks = nn.ModuleList(  # ModuleList since Sequential can only accept one input, and we need `x, mask, cos, sin`
+        self.trf_blocks = nn.ModuleList(  # 用 ModuleList 是因為 Sequential 只能接受一個輸入，而我們需要 `x, mask, cos, sin`
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])]
         )
         self.final_norm = RMSNorm(cfg["emb_dim"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False, dtype=cfg["dtype"])
 
-        # Reusable utilities
+        # 可重複使用的工具
         if cfg["head_dim"] is None:
             head_dim = cfg["emb_dim"] // cfg["n_heads"]
         else:
@@ -42,7 +42,7 @@ class Qwen3Model(nn.Module):
         self.register_buffer("cos", cos, persistent=False)
         self.register_buffer("sin", sin, persistent=False)
         self.cfg = cfg
-        self.current_pos = 0  # Track current position in KV cache
+        self.current_pos = 0  # 追蹤 KV cache 中目前的位置
 
     def forward(self, in_idx, cache=None):
         # Forward pass
@@ -67,7 +67,7 @@ class Qwen3Model(nn.Module):
             mask = torch.triu(
                 torch.ones(num_tokens, num_tokens, device=x.device, dtype=torch.bool), diagonal=1
             )
-        # Shape (1, 1, num_tokens, num_tokens) to broadcast across batch and heads
+        # Shape (1, 1, num_tokens, num_tokens)，可 broadcast 到 batch 和 head
         mask = mask[None, None, :, :]
 
         for i, block in enumerate(self.trf_blocks):
@@ -105,17 +105,17 @@ class TransformerBlock(nn.Module):
         self.norm2 = RMSNorm(cfg["emb_dim"], eps=1e-6)
 
     def forward(self, x, mask, cos, sin, start_pos=0, cache=None):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x, next_cache = self.att(x, mask, cos, sin, start_pos=start_pos, cache=cache)  # Shape [batch_size, num_tokens, emb_size]
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x, next_cache
 
@@ -220,7 +220,7 @@ class GroupedQueryAttention(nn.Module):
     def forward(self, x, mask, cos, sin, start_pos=0, cache=None):
         b, num_tokens, _ = x.shape
 
-        # Apply projections
+        # 套用投影
         queries = self.W_query(x)  # (b, num_tokens, num_heads * head_dim)
         keys = self.W_key(x)       # (b, num_tokens, num_kv_groups * head_dim)
         values = self.W_value(x)   # (b, num_tokens, num_kv_groups * head_dim)
@@ -230,13 +230,13 @@ class GroupedQueryAttention(nn.Module):
         keys_new = keys.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
         values_new = values.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
 
-        # Optional normalization
+        # 可選的正規化
         if self.q_norm:
             queries = self.q_norm(queries)
         if self.k_norm:
             keys_new = self.k_norm(keys_new)
 
-        # Apply RoPE
+        # 套用 RoPE
         queries = apply_rope(queries, cos, sin, offset=start_pos)
         keys_new = apply_rope(keys_new, cos, sin, offset=start_pos)
 
@@ -246,11 +246,11 @@ class GroupedQueryAttention(nn.Module):
             values = torch.cat([prev_v, values_new], dim=2)
             next_cache = (keys, values)
         else:
-            start_pos = 0  # reset RoPE
+            start_pos = 0  # 重設 RoPE
             keys, values = keys_new, values_new
             next_cache = (keys, values)
 
-        # Expand K and V to match number of heads
+        # 擴展 K 和 V 以符合 head 數量
         keys = keys.repeat_interleave(self.group_size, dim=1)
         values = values.repeat_interleave(self.group_size, dim=1)
 
@@ -266,19 +266,19 @@ class GroupedQueryAttention(nn.Module):
 def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, dtype=torch.float32):
     assert head_dim % 2 == 0, "Embedding dimension must be even"
 
-    # Compute the inverse frequencies
+    # 計算逆頻率
     inv_freq = 1.0 / (theta_base ** (torch.arange(0, head_dim, 2, dtype=dtype)[: (head_dim // 2)].float() / head_dim))
 
-    # Generate position indices
+    # 產生位置 index
     positions = torch.arange(context_length, dtype=dtype)
 
-    # Compute the angles
-    angles = positions[:, None] * inv_freq[None, :]  # Shape: (context_length, head_dim // 2)
+    # 計算角度
+    angles = positions[:, None] * inv_freq[None, :]  # Shape：(context_length, head_dim // 2)
 
-    # Expand angles to match the head_dim
-    angles = torch.cat([angles, angles], dim=1)  # Shape: (context_length, head_dim)
+    # 擴展角度以符合 head_dim
+    angles = torch.cat([angles, angles], dim=1)  # Shape：(context_length, head_dim)
 
-    # Precompute sine and cosine
+    # 預先計算 sine 和 cosine
     cos = torch.cos(angles)
     sin = torch.sin(angles)
 
@@ -286,23 +286,23 @@ def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, dtype=
 
 
 def apply_rope(x, cos, sin, offset=0):
-    # x: (batch_size, num_heads, seq_len, head_dim)
+    # x：(batch_size, num_heads, seq_len, head_dim)
     batch_size, num_heads, seq_len, head_dim = x.shape
     assert head_dim % 2 == 0, "Head dimension must be even"
 
-    # Split x into first half and second half
-    x1 = x[..., : head_dim // 2]  # First half
-    x2 = x[..., head_dim // 2:]  # Second half
+    # 把 x 拆成前半和後半
+    x1 = x[..., : head_dim // 2]  # 前半段
+    x2 = x[..., head_dim // 2:]  # 後半段
 
-    # Adjust sin and cos shapes
-    cos = cos[offset:offset + seq_len, :].unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, seq_len, head_dim)
+    # 調整 sin 和 cos 的形狀
+    cos = cos[offset:offset + seq_len, :].unsqueeze(0).unsqueeze(0)  # Shape：(1, 1, seq_len, head_dim)
     sin = sin[offset:offset + seq_len, :].unsqueeze(0).unsqueeze(0)
 
-    # Apply the rotary transformation
+    # 套用旋轉轉換
     rotated = torch.cat((-x2, x1), dim=-1)
     x_rotated = (x * cos) + (rotated * sin)
 
-    # It's ok to use lower-precision after applying cos and sin rotation
+    # 套用 cos 和 sin 旋轉之後，使用較低精度是可以的
     return x_rotated.to(dtype=x.dtype)
 
 

@@ -20,12 +20,12 @@ def load_dataframes():
 
 
 def eval_model(model, X_train, y_train, X_val, y_val, X_test, y_test):
-    # Making predictions
+    # 進行預測
     y_pred_train = model.predict(X_train)
     y_pred_val = model.predict(X_val)
     y_pred_test = model.predict(X_test)
 
-    # Calculating accuracy and balanced accuracy
+    # 計算準確率與 balanced accuracy
     accuracy_train = accuracy_score(y_train, y_pred_train)
     # balanced_accuracy_train = balanced_accuracy_score(y_train, y_pred_train)
 
@@ -35,7 +35,7 @@ def eval_model(model, X_train, y_train, X_val, y_val, X_test, y_test):
     accuracy_test = accuracy_score(y_test, y_pred_test)
     # balanced_accuracy_test = balanced_accuracy_score(y_test, y_pred_test)
 
-    # Printing the results
+    # 印出結果
     print(f"Training Accuracy: {accuracy_train*100:.2f}%")
     print(f"Validation Accuracy: {accuracy_val*100:.2f}%")
     print(f"Test Accuracy: {accuracy_test*100:.2f}%")
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     df_train, df_val, df_test = load_dataframes()
 
     #########################################
-    # Convert text into bag-of-words model
+    # 把文字轉成 bag-of-words 模型
     vectorizer = CountVectorizer()
     #########################################
 
@@ -59,10 +59,10 @@ if __name__ == "__main__":
     y_train, y_val, y_test = df_train["label"], df_val["label"], df_test["label"]
 
     #####################################
-    # Model training and evaluation
+    # 模型訓練與評估
     #####################################
 
-    # Create a dummy classifier with the strategy to predict the most frequent class
+    # 建立一個總是預測最多數類別的 dummy 分類器
     dummy_clf = DummyClassifier(strategy="most_frequent")
     dummy_clf.fit(X_train, y_train)
 

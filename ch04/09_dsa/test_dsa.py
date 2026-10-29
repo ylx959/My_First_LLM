@@ -47,7 +47,7 @@ def test_causal_property():
     x = torch.randn(b, T, d)
     out_full = attn(x)
 
-    # Replace tokens at positions 6+ with random noise
+    # 把位置 6 以後的 token 換成隨機雜訊
     x_noisy = x.clone()
     x_noisy[:, 6:, :] = torch.randn(b, T - 6, d)
     out_noisy = attn(x_noisy)
@@ -66,7 +66,7 @@ def test_sparsity():
     )
     x = torch.randn(b, T, d)
 
-    # Reconstruct the combined (causal + sparse) mask
+    # 重建合併後的（causal + 稀疏）mask
     q_pos = torch.arange(T)
     k_pos = torch.arange(T)
     causal_bool = q_pos.unsqueeze(-1) < k_pos.unsqueeze(0)
@@ -149,7 +149,7 @@ def test_cache_consistency():
         "qkv_bias": False,
         "index_n_heads": 2,
         "index_head_dim": 32,
-        "topk": 200,   # large topk == full attention, so both modes match exactly
+        "topk": 200,   # topk 很大時等同 full attention，所以兩種模式結果完全相同
     }
     torch.manual_seed(42)
     model = GPTModel(cfg)

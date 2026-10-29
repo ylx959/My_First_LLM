@@ -58,26 +58,26 @@ class CausalAttention(nn.Module):
         self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
-        self.dropout = nn.Dropout(dropout)  # New
-        self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1)) # New
+        self.dropout = nn.Dropout(dropout)  # 新增
+        self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1)) # 新增
 
     def forward(self, x):
-        b, num_tokens, d_in = x.shape  # New batch dimension b
-        # For inputs where `num_tokens` exceeds `context_length`, this will result in errors
-        # in the mask creation further below.
-        # In practice, this is not a problem since the LLM (chapters 4-7) ensures that inputs
-        # do not exceed `context_length` before reaching this forward method.
+        b, num_tokens, d_in = x.shape  # 新的 batch 維度 b
+        # 當輸入的 `num_tokens` 超過 `context_length` 時會出錯
+        # 在下面建立 mask 的地方。
+        # 實際上這不是問題，因為 LLM（第 4-7 章）會確保輸入
+        # 在進入這個 forward 方法之前不會超過 `context_length`。
         keys = self.W_key(x)
         queries = self.W_query(x)
         values = self.W_value(x)
 
-        attn_scores = queries @ keys.transpose(1, 2)  # Changed transpose
-        attn_scores.masked_fill_(  # New, _ ops are in-place
-            self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)  # `:num_tokens` to account for cases where the number of tokens in the batch is smaller than the supported context_size
+        attn_scores = queries @ keys.transpose(1, 2)  # 改了 transpose
+        attn_scores.masked_fill_(  # 新增：_ 結尾的運算是 in-place
+            self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)  # 用 `:num_tokens` 處理 batch 中 token 數比支援的 context_size 少的情況
         attn_weights = torch.softmax(
             attn_scores / keys.shape[-1]**0.5, dim=-1
         )
-        attn_weights = self.dropout(attn_weights)  # New
+        attn_weights = self.dropout(attn_weights)  # 新增
 
         context_vec = attn_weights @ values
         return context_vec
@@ -102,57 +102,57 @@ class MultiHeadAttention(nn.Module):
 
         self.d_out = d_out
         self.num_heads = num_heads
-        self.head_dim = d_out // num_heads  # Reduce the projection dim to match desired output dim
+        self.head_dim = d_out // num_heads  # 縮小投影維度以符合想要的輸出維度
 
         self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
-        self.out_proj = nn.Linear(d_out, d_out)  # Linear layer to combine head outputs
+        self.out_proj = nn.Linear(d_out, d_out)  # 合併各 head 輸出的 linear 層
         self.dropout = nn.Dropout(dropout)
         self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
 
     def forward(self, x):
         b, num_tokens, d_in = x.shape
 
-        keys = self.W_key(x)  # Shape: (b, num_tokens, d_out)
+        keys = self.W_key(x)  # Shape：(b, num_tokens, d_out)
         queries = self.W_query(x)
         values = self.W_value(x)
 
-        # We implicitly split the matrix by adding a `num_heads` dimension
-        # Unroll last dim: (b, num_tokens, d_out) -> (b, num_tokens, num_heads, head_dim)
+        # 透過加上 `num_heads` 維度，隱含地切分矩陣
+        # 展開最後一維：(b, num_tokens, d_out) -> (b, num_tokens, num_heads, head_dim)
         keys = keys.view(b, num_tokens, self.num_heads, self.head_dim)
         values = values.view(b, num_tokens, self.num_heads, self.head_dim)
         queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
 
-        # Transpose: (b, num_tokens, num_heads, head_dim) -> (b, num_heads, num_tokens, head_dim)
+        # Transpose：(b, num_tokens, num_heads, head_dim) -> (b, num_heads, num_tokens, head_dim)
         keys = keys.transpose(1, 2)
         queries = queries.transpose(1, 2)
         values = values.transpose(1, 2)
 
-        # Compute scaled dot-product attention (aka self-attention) with a causal mask
-        attn_scores = queries @ keys.transpose(2, 3)  # Dot product for each head
+        # 計算帶 causal mask 的 scaled dot-product attention（也就是 self-attention）
+        attn_scores = queries @ keys.transpose(2, 3)  # 每個 head 的內積
 
-        # Original mask truncated to the number of tokens and converted to boolean
+        # 原本的 mask 截斷到 token 數，並轉成布林值
         mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
 
-        # Use the mask to fill attention scores
+        # 用 mask 填入 attention 分數
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
-        # Shape: (b, num_tokens, num_heads, head_dim)
+        # Shape：(b, num_tokens, num_heads, head_dim)
         context_vec = (attn_weights @ values).transpose(1, 2)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.reshape(b, num_tokens, self.d_out)
-        context_vec = self.out_proj(context_vec)  # optional projection
+        context_vec = self.out_proj(context_vec)  # 可選的投影
 
         return context_vec
 
 
 ######################
-# Bonus
+# 加分題
 ######################
 
 
@@ -182,7 +182,7 @@ class PyTorchMultiHeadAttention(nn.Module):
         # (b, num_tokens, 3, num_heads, head_dim) --> (3, b, num_heads, num_tokens, head_dim)
         qkv = qkv.permute(2, 0, 3, 1, 4)
 
-        # (3, b, num_heads, num_tokens, head_dim) -> 3 times (b, num_heads, num_tokens, head_dim)
+        # (3, b, num_heads, num_tokens, head_dim) -> 拆成 3 個 (b, num_heads, num_tokens, head_dim)
         queries, keys, values = qkv
 
         use_dropout = 0. if not self.training else self.dropout
@@ -190,7 +190,7 @@ class PyTorchMultiHeadAttention(nn.Module):
         context_vec = nn.functional.scaled_dot_product_attention(
             queries, keys, values, attn_mask=None, dropout_p=use_dropout, is_causal=True)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.transpose(1, 2).contiguous().view(batch_size, num_tokens, self.d_out)
 
         context_vec = self.proj(context_vec)

@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# A minimal instruction finetuning file based on the code in chapter 7
+# 根據第 7 章程式碼寫成的最精簡 instruction finetuning 檔案
 
 import json
 import psutil
@@ -12,20 +12,20 @@ import requests
 
 
 def query_model(prompt, model="llama3", url="http://localhost:11434/api/chat"):
-    # Create the data payload as a dictionary
+    # 用 dictionary 建立要送出的資料
     data = {
         "model": model,
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "options": {     # Settings below are required for deterministic responses
+        "options": {     # 下面的設定是為了得到確定性的回應
             "seed": 123,
             "temperature": 0,
             "num_ctx": 2048
         }
     }
 
-    # Send the POST request
+    # 送出 POST 請求
     with requests.post(url, json=data, stream=True, timeout=30) as r:
         r.raise_for_status()
         response_data = ""

@@ -1,6 +1,6 @@
-# Source: https://github.com/openai/gpt-2/blob/master/src/encoder.py
-# License:
-# Modified MIT License
+# 來源：https://github.com/openai/gpt-2/blob/master/src/encoder.py
+# 授權：
+# 修改版 MIT 授權
 
 # Software Copyright (c) 2019 OpenAI
 
@@ -73,13 +73,13 @@ class Encoder:
     def __init__(self, encoder, bpe_merges, errors="replace"):
         self.encoder = encoder
         self.decoder = {v: k for k, v in self.encoder.items()}
-        self.errors = errors  # how to handle errors in decoding
+        self.errors = errors  # decode 出錯時的處理方式
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
 
-        # Should have added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions
+        # 應該加上 re.IGNORECASE，讓大寫版本的縮寫也能進行 BPE 合併
         self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
     def bpe(self, token):
@@ -146,11 +146,11 @@ def get_encoder(model_name, models_dir):
 
 
 def download_vocab():
-    # Modified code from
+    # 程式碼修改自
     subdir = "gpt2_model"
     if not os.path.exists(subdir):
         os.makedirs(subdir)
-    subdir = subdir.replace("\\", "/")  # needed for Windows
+    subdir = subdir.replace("\\", "/")  # Windows 需要
 
     for filename in ["encoder.json", "vocab.bpe"]:
         r = requests.get("https://openaipublic.blob.core.windows.net/gpt-2/models/117M/" + filename, stream=True)
@@ -159,7 +159,7 @@ def download_vocab():
             file_size = int(r.headers["content-length"])
             chunk_size = 1000
             with tqdm(ncols=100, desc="Fetching " + filename, total=file_size, unit_scale=True) as pbar:
-                # 1k for chunk_size, since Ethernet packet size is around 1500 bytes
+                # chunk_size 設 1k，因為 Ethernet 封包大小約 1500 bytes
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     f.write(chunk)
                     pbar.update(chunk_size)

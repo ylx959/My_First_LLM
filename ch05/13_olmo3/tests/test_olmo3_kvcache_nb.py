@@ -25,7 +25,7 @@ def import_notebook_defs():
 @pytest.fixture
 def dummy_input():
     torch.manual_seed(123)
-    return torch.randint(0, 100, (1, 8))  # batch size 1, seq length 8
+    return torch.randint(0, 100, (1, 8))  # batch size 為 1，序列長度 8
 
 
 @pytest.fixture
@@ -38,13 +38,13 @@ def dummy_cfg_base():
         "n_layers": 2,
         "hidden_dim": 64,
         "head_dim": 8,
-        "n_kv_heads": 1,  # 4 query heads, 1 KV groups -> group_size = 4
+        "n_kv_heads": 1,  # 4 個 query head、1 個 KV group -> group_size = 4
         "attention_bias": False,
         "attention_dropout": 0.0,
         "sliding_window": 4,
         "layer_types": ["full_attention"] * 2,
 
-        # RoPE config
+        # RoPE 設定
         "rope_base": 10_000.0,
         "rope_attention_factor": 1.0,
         "rope_type": "default",
@@ -68,7 +68,7 @@ def test_dummy_olmo3_forward(dummy_cfg_base, dummy_input, import_notebook_defs):
 def test_olmo3_base_equivalence_with_transformers(import_notebook_defs):
     from transformers import Olmo3Config, Olmo3ForCausalLM
 
-    # Tiny config so the test is fast
+    # 很小的設定，讓測試跑得快
     cfg = {
         "vocab_size": 257,
         "context_length": 8,
@@ -84,10 +84,10 @@ def test_olmo3_base_equivalence_with_transformers(import_notebook_defs):
         "dtype": torch.float32,
         "query_pre_attn_scalar": 256,
 
-        # required by TransformerBlock
+        # TransformerBlock 需要
         "attention_bias": False,
 
-        # required by RMSNorm and RoPE setup in Olmo3Model
+        # Olmo3Model 中的 RMSNorm 和 RoPE 設定需要
         "rms_norm_eps": 1e-6,
         "rope_base": 1_000_000.0,
         "rope_attention_factor": 1.0,
@@ -95,7 +95,7 @@ def test_olmo3_base_equivalence_with_transformers(import_notebook_defs):
         "rope_factor": 1.0,
         "rope_orig_max": 8,
 
-        # extra HF-only stuff
+        # HF 才有的額外東西
         "rope_local_base": 10_000.0,
     }
 

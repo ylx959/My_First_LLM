@@ -5,7 +5,7 @@
 
 import matplotlib.pyplot as plt
 
-# Bytes per element
+# 每個元素的 bytes 數
 DTYPE_BYTES = {
     "fp32": 4,
     "bf16": 2,

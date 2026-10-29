@@ -10,7 +10,7 @@ import tiktoken
 import torch
 import chainlit
 
-# For llms_from_scratch installation instructions, see:
+# llms_from_scratch 的安裝說明請見：
 # https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
 from llms_from_scratch.ch04 import GPTModel
 from llms_from_scratch.ch06 import classify_review
@@ -26,13 +26,13 @@ def get_model_and_tokenizer():
     """
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,     # 詞彙表大小
         "context_length": 1024,  # Context length
-        "emb_dim": 768,          # Embedding dimension
-        "n_heads": 12,           # Number of attention heads
-        "n_layers": 12,          # Number of layers
-        "drop_rate": 0.1,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "emb_dim": 768,          # Embedding 維度
+        "n_heads": 12,           # Attention head 數
+        "n_layers": 12,          # 層數
+        "drop_rate": 0.1,        # Dropout 比例
+        "qkv_bias": True         # Query-key-value 的 bias
     }
 
     tokenizer = tiktoken.get_encoding("gpt2")
@@ -45,14 +45,14 @@ def get_model_and_tokenizer():
         )
         sys.exit()
 
-    # Instantiate model
+    # 建立模型
     model = GPTModel(GPT_CONFIG_124M)
 
-    # Convert model to classifier as in section 6.5 in ch06.ipynb
+    # 依照 ch06.ipynb 第 6.5 節把模型改成分類器
     num_classes = 2
     model.out_head = torch.nn.Linear(in_features=GPT_CONFIG_124M["emb_dim"], out_features=num_classes)
 
-    # Then load model weights
+    # 接著載入模型權重
     checkpoint = torch.load(model_path, map_location=device, weights_only=True)
     model.load_state_dict(checkpoint)
     model.to(device)
@@ -61,7 +61,7 @@ def get_model_and_tokenizer():
     return tokenizer, model
 
 
-# Obtain the necessary tokenizer and model files for the chainlit function below
+# 取得下面 chainlit 函式需要的 tokenizer 和模型檔案
 tokenizer, model = get_model_and_tokenizer()
 
 
@@ -75,5 +75,5 @@ async def main(message: chainlit.Message):
     label = classify_review(user_input, model, tokenizer, device, max_length=120)
 
     await chainlit.Message(
-        content=f"{label}",  # This returns the model response to the interface
+        content=f"{label}",  # 把模型回應傳回介面
     ).send()

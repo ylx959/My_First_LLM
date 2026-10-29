@@ -25,7 +25,7 @@ def import_notebook_defs():
 @pytest.fixture
 def dummy_input():
     torch.manual_seed(123)
-    return torch.randint(0, 100, (1, 8))  # batch size 1, seq length 8
+    return torch.randint(0, 100, (1, 8))  # batch size 為 1，序列長度 8
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def test_dummy_tiny_aya_forward(dummy_cfg_base, dummy_input, import_notebook_def
 def test_tiny_aya_base_equivalence_with_transformers(import_notebook_defs):
     from transformers import Cohere2Config, Cohere2ForCausalLM
 
-    # Tiny config so the test is fast
+    # 很小的設定，讓測試跑得快
     cfg = {
         "vocab_size": 257,
         "context_length": 8,

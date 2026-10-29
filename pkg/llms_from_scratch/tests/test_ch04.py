@@ -14,13 +14,13 @@ import tiktoken
 
 
 GPT_CONFIG_124M = {
-    "vocab_size": 50257,     # Vocabulary size
+    "vocab_size": 50257,     # 詞彙表大小
     "context_length": 1024,  # Context length
-    "emb_dim": 768,          # Embedding dimension
-    "n_heads": 12,           # Number of attention heads
-    "n_layers": 12,          # Number of layers
-    "drop_rate": 0.1,        # Dropout rate
-    "qkv_bias": False        # Query-Key-Value bias
+    "emb_dim": 768,          # Embedding 維度
+    "n_heads": 12,           # Attention head 數
+    "n_layers": 12,          # 層數
+    "drop_rate": 0.1,        # Dropout 比例
+    "qkv_bias": False        # Query-Key-Value 的 bias
 }
 
 
@@ -28,7 +28,7 @@ GPT_CONFIG_124M = {
 @pytest.mark.parametrize("generate_fn", [generate_text_simple, generate_text_simple_cached])
 def test_gpt_model_variants(ModelClass, generate_fn):
 
-    # Skip incompatible combinations
+    # 略過不相容的組合
     if generate_fn is generate_text_simple and getattr(ModelClass, "reset_kv_cache", False):
         return
     if generate_fn is generate_text_simple_cached and not getattr(ModelClass, "reset_kv_cache", False):
@@ -36,7 +36,7 @@ def test_gpt_model_variants(ModelClass, generate_fn):
 
     torch.manual_seed(123)
     model = ModelClass(GPT_CONFIG_124M)
-    model.eval()  # disable dropout
+    model.eval()  # 關閉 dropout
 
     start_context = "Hello, I am"
 

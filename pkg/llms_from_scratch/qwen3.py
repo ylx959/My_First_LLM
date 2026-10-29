@@ -13,29 +13,29 @@ import torch
 import torch.nn as nn
 
 
-# 0.6 billion parameters
+# 6 億個參數
 QWEN_CONFIG_06_B = {
-    "vocab_size": 151_936,           # Vocabulary size
-    "context_length": 40_960,        # Context length that was used to train the model
-    "emb_dim": 1024,                 # Embedding dimension
-    "n_heads": 16,                   # Number of attention heads
-    "n_layers": 28,                  # Number of layers
-    "hidden_dim": 3072,              # Size of the intermediate dimension in FeedForward
-    "head_dim": 128,                 # Size of the heads in GQA
-    "qk_norm": True,                 # Whether to normalize queries and keys in GQA
-    "n_kv_groups": 8,                # Key-Value groups for grouped-query attention
-    "rope_base": 1_000_000.0,        # The base in RoPE's "theta"
-    "dtype": torch.bfloat16,         # Lower-precision dtype to reduce memory usage
+    "vocab_size": 151_936,           # 詞彙表大小
+    "context_length": 40_960,        # 訓練模型時使用的 context length
+    "emb_dim": 1024,                 # Embedding 維度
+    "n_heads": 16,                   # Attention head 數
+    "n_layers": 28,                  # 層數
+    "hidden_dim": 3072,              # FeedForward 中間層的大小
+    "head_dim": 128,                 # GQA 中 head 的大小
+    "qk_norm": True,                 # GQA 中是否正規化 queries 和 keys
+    "n_kv_groups": 8,                # grouped-query attention 的 Key-Value group 數
+    "rope_base": 1_000_000.0,        # RoPE "theta" 的 base
+    "dtype": torch.bfloat16,         # 使用較低精度的 dtype 以減少記憶體用量
 }
 
-# 1.7 billion parameters
+# 17 億個參數
 QWEN3_CONFIG_1_7B = {
     "vocab_size": 151_936,
     "context_length": 40_960,
-    "emb_dim": 2048,                 # 2x larger than above
+    "emb_dim": 2048,                 # 比上面大 2 倍
     "n_heads": 16,
     "n_layers": 28,
-    "hidden_dim": 6144,              # 2x larger than above
+    "hidden_dim": 6144,              # 比上面大 2 倍
     "head_dim": 128,
     "qk_norm": True,
     "n_kv_groups": 8,
@@ -43,14 +43,14 @@ QWEN3_CONFIG_1_7B = {
     "dtype": torch.bfloat16,
 }
 
-# 4 billion parameters
+# 40 億個參數
 QWEN3_CONFIG_4B = {
     "vocab_size": 151_936,
     "context_length": 40_960,
-    "emb_dim": 2560,                 # 25% larger than above
-    "n_heads": 32,                   # 2x larger than above
-    "n_layers": 36,                  # 29% larger than above
-    "hidden_dim": 9728,              # ~3x larger than above
+    "emb_dim": 2560,                 # 比上面大 25%
+    "n_heads": 32,                   # 比上面大 2 倍
+    "n_layers": 36,                  # 比上面大 29%
+    "hidden_dim": 9728,              # 比上面大約 3 倍
     "head_dim": 128,
     "qk_norm": True,
     "n_kv_groups": 8,
@@ -58,14 +58,14 @@ QWEN3_CONFIG_4B = {
     "dtype": torch.bfloat16,
 }
 
-# 8 billion parameters
+# 80 億個參數
 QWEN3_CONFIG_8B = {
     "vocab_size": 151_936,
     "context_length": 40_960,
-    "emb_dim": 4096,                 # 60% larger than above
+    "emb_dim": 4096,                 # 比上面大 60%
     "n_heads": 32,
     "n_layers": 36,
-    "hidden_dim": 12288,             # 26% larger than above
+    "hidden_dim": 12288,             # 比上面大 26%
     "head_dim": 128,
     "qk_norm": True,
     "n_kv_groups": 8,
@@ -73,14 +73,14 @@ QWEN3_CONFIG_8B = {
     "dtype": torch.bfloat16,
 }
 
-# 14 billion parameters
+# 140 億個參數
 QWEN3_CONFIG_14B = {
         "vocab_size": 151_936,
         "context_length": 40_960,
-        "emb_dim": 5120,                 # 25% larger than above
-        "n_heads": 40,                   # 25% larger than above
-        "n_layers": 40,                  # 11% larger than above
-        "hidden_dim": 17408,             # 42% larger than above
+        "emb_dim": 5120,                 # 比上面大 25%
+        "n_heads": 40,                   # 比上面大 25%
+        "n_layers": 40,                  # 比上面大 11%
+        "hidden_dim": 17408,             # 比上面大 42%
         "head_dim": 128,
         "qk_norm": True,
         "n_kv_groups": 8,
@@ -92,9 +92,9 @@ QWEN3_CONFIG_32B = {
         "vocab_size": 151_936,
         "context_length": 40_960,
         "emb_dim": 5120,
-        "n_heads": 64,                   # 60% larger than above
-        "n_layers": 64,                  # 60% larger than above
-        "hidden_dim": 25600,             # 47% larger than above
+        "n_heads": 64,                   # 比上面大 60%
+        "n_layers": 64,                  # 比上面大 60%
+        "hidden_dim": 25600,             # 比上面大 47%
         "head_dim": 128,
         "qk_norm": True,
         "n_kv_groups": 8,
@@ -102,7 +102,7 @@ QWEN3_CONFIG_32B = {
         "dtype": torch.bfloat16,
 }
 
-# Mixture of Experts Model
+# Mixture of Experts 模型
 QWEN3_CONFIG_30B_A3B = {
     "vocab_size": 151_936,
     "context_length": 262_144,
@@ -124,16 +124,16 @@ class Qwen3Model(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # Main model parameters
+        # 主要模型參數
         self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"], dtype=cfg["dtype"])
 
-        self.trf_blocks = nn.ModuleList(  # ModuleList since Sequential can only accept one input, and we need `x, mask, cos, sin`
+        self.trf_blocks = nn.ModuleList(  # 用 ModuleList 是因為 Sequential 只能接受一個輸入，而我們需要 `x, mask, cos, sin`
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])]
         )
         self.final_norm = RMSNorm(cfg["emb_dim"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False, dtype=cfg["dtype"])
 
-        # Reusable utilities
+        # 可重複使用的工具
         if cfg["head_dim"] is None:
             head_dim = cfg["emb_dim"] // cfg["n_heads"]
         else:
@@ -181,17 +181,17 @@ class TransformerBlock(nn.Module):
         self.norm2 = RMSNorm(cfg["emb_dim"], eps=1e-6)
 
     def forward(self, x, mask, cos, sin):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x = self.att(x, mask, cos, sin,)  # Shape [batch_size, num_tokens, emb_size]
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -296,7 +296,7 @@ class GroupedQueryAttention(nn.Module):
     def forward(self, x, mask, cos, sin):
         b, num_tokens, _ = x.shape
 
-        # Apply projections
+        # 套用投影
         queries = self.W_query(x)  # (b, num_tokens, num_heads * head_dim)
         keys = self.W_key(x)       # (b, num_tokens, num_kv_groups * head_dim)
         values = self.W_value(x)   # (b, num_tokens, num_kv_groups * head_dim)
@@ -306,17 +306,17 @@ class GroupedQueryAttention(nn.Module):
         keys = keys.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
         values = values.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
 
-        # Optional normalization
+        # 可選的正規化
         if self.q_norm:
             queries = self.q_norm(queries)
         if self.k_norm:
             keys = self.k_norm(keys)
 
-        # Apply RoPE
+        # 套用 RoPE
         queries = apply_rope(queries, cos, sin)
         keys = apply_rope(keys, cos, sin)
 
-        # Expand K and V to match number of heads
+        # 擴展 K 和 V 以符合 head 數量
         keys = keys.repeat_interleave(self.group_size, dim=1)
         values = values.repeat_interleave(self.group_size, dim=1)
 
@@ -330,23 +330,23 @@ class GroupedQueryAttention(nn.Module):
 
 
 # ==============================================================================
-# RoPE implementation summary
+# RoPE 實作摘要
 #
 #
-# There are two common styles to implement RoPE, which are
-# mathematically equivalent;
-# they mainly differ in how the rotation matrix pairs dimensions.
+# 實作 RoPE 有兩種常見的風格，分別是
+# 數學上等價；
+# 它們主要的差別在於旋轉矩陣如何配對維度。
 #
-# 1) Split-halves style (this repo, Hugging Face Transformers):
+# 1) Split-halves 風格（本 repo、Hugging Face Transformers）：
 #
-#   For hidden dim d = 8 (example):
+#   以隱藏維度 d = 8 為例：
 #
 #       [ x0   x1   x2   x3   x4   x5   x6   x7 ]
 #         │    │    │    │    │    │    │    │
 #         ▼    ▼    ▼    ▼    ▼    ▼    ▼    ▼
 #        cos  cos  cos  cos  sin  sin  sin  sin
 #
-#   Rotation matrix:
+#   旋轉矩陣：
 #
 #       [ cosθ   -sinθ    0      0   ... ]
 #       [ sinθ    cosθ    0      0   ... ]
@@ -354,49 +354,49 @@ class GroupedQueryAttention(nn.Module):
 #       [  0       0    sinθ    cosθ ... ]
 #        ...
 #
-#   Here, the embedding dims are split into two halves and then
-#   each one is rotated in blocks.
+#   這裡 embedding 維度被切成前後兩半，然後
+#   每一個都以區塊為單位旋轉。
 #
 #
-# 2) Interleaved (even/odd) style (original paper, Llama repo):
+# 2) Interleaved（偶數/奇數）風格（原始論文、Llama repo）：
 #
-#   For hidden dim d = 8 (example):
+#   以隱藏維度 d = 8 為例：
 #
 #       [ x0   x1   x2   x3   x4   x5   x6   x7 ]
 #         │    │    │    │    │    │    │    │
 #         ▼    ▼    ▼    ▼    ▼    ▼    ▼    ▼
 #        cos  sin  cos  sin  cos  sin  cos  sin
 #
-#   Rotation matrix:
+#   旋轉矩陣：
 #       [ cosθ  -sinθ    0      0   ... ]
 #       [ sinθ   cosθ    0      0   ... ]
 #       [  0      0    cosθ   -sinθ ... ]
 #       [  0      0    sinθ    cosθ ... ]
 #        ...
 #
-#   Here, embedding dims are interleaved as even/odd cosine/sine pairs.
+#   這裡 embedding 維度以偶數/奇數的 cosine/sine 配對交錯排列。
 #
-# Both layouts encode the same relative positions; the only difference is how
-# dimensions are paired.
+# 兩種排列編碼的相對位置相同；唯一的差別在於
+# 維度是成對的。
 # ==============================================================================
 
 
 def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, dtype=torch.float32):
     assert head_dim % 2 == 0, "Embedding dimension must be even"
 
-    # Compute the inverse frequencies
+    # 計算逆頻率
     inv_freq = 1.0 / (theta_base ** (torch.arange(0, head_dim, 2, dtype=dtype)[: (head_dim // 2)].float() / head_dim))
 
-    # Generate position indices
+    # 產生位置 index
     positions = torch.arange(context_length, dtype=dtype)
 
-    # Compute the angles
-    angles = positions.unsqueeze(1) * inv_freq.unsqueeze(0) # Shape: (context_length, head_dim // 2)
+    # 計算角度
+    angles = positions.unsqueeze(1) * inv_freq.unsqueeze(0) # Shape：(context_length, head_dim // 2)
 
-    # Expand angles to match the head_dim
-    angles = torch.cat([angles, angles], dim=1)  # Shape: (context_length, head_dim)
+    # 擴展角度以符合 head_dim
+    angles = torch.cat([angles, angles], dim=1)  # Shape：(context_length, head_dim)
 
-    # Precompute sine and cosine
+    # 預先計算 sine 和 cosine
     cos = torch.cos(angles)
     sin = torch.sin(angles)
 
@@ -404,23 +404,23 @@ def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, dtype=
 
 
 def apply_rope(x, cos, sin):
-    # x: (batch_size, num_heads, seq_len, head_dim)
+    # x：(batch_size, num_heads, seq_len, head_dim)
     batch_size, num_heads, seq_len, head_dim = x.shape
     assert head_dim % 2 == 0, "Head dimension must be even"
 
-    # Split x into first half and second half
-    x1 = x[..., : head_dim // 2]  # First half
-    x2 = x[..., head_dim // 2:]  # Second half
+    # 把 x 拆成前半和後半
+    x1 = x[..., : head_dim // 2]  # 前半段
+    x2 = x[..., head_dim // 2:]  # 後半段
 
-    # Adjust sin and cos shapes
-    cos = cos[:seq_len, :].unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, seq_len, head_dim)
+    # 調整 sin 和 cos 的形狀
+    cos = cos[:seq_len, :].unsqueeze(0).unsqueeze(0)  # Shape：(1, 1, seq_len, head_dim)
     sin = sin[:seq_len, :].unsqueeze(0).unsqueeze(0)
 
-    # Apply the rotary transformation
+    # 套用旋轉轉換
     rotated = torch.cat((-x2, x1), dim=-1)
     x_rotated = (x * cos) + (rotated * sin)
 
-    # It's ok to use lower-precision after applying cos and sin rotation
+    # 套用 cos 和 sin 旋轉之後，使用較低精度是可以的
     return x_rotated.to(dtype=x.dtype)
 
 
@@ -467,7 +467,7 @@ def load_weights_into_qwen(model, param_config, params):
         block = model.trf_blocks[l]
         att = block.att
 
-        # Q, K, V projections
+        # Q、K、V 投影
         att.W_query.weight = assign(
             att.W_query.weight,
             params[f"model.layers.{l}.self_attn.q_proj.weight"],
@@ -484,14 +484,14 @@ def load_weights_into_qwen(model, param_config, params):
             f"model.layers.{l}.self_attn.v_proj.weight"
         )
 
-        # Output projection
+        # 輸出投影
         att.out_proj.weight = assign(
             att.out_proj.weight,
             params[f"model.layers.{l}.self_attn.o_proj.weight"],
             f"model.layers.{l}.self_attn.o_proj.weight"
         )
 
-        # QK norms
+        # QK norm
         if hasattr(att, "q_norm") and att.q_norm is not None:
             att.q_norm.scale = assign(
                 att.q_norm.scale,
@@ -505,22 +505,22 @@ def load_weights_into_qwen(model, param_config, params):
                 f"model.layers.{l}.self_attn.k_norm.weight"
             )
 
-        # Attention layernorm
+        # Attention 的 layernorm
         block.norm1.scale = assign(
             block.norm1.scale,
             params[f"model.layers.{l}.input_layernorm.weight"],
             f"model.layers.{l}.input_layernorm.weight"
         )
 
-        # Feedforward weights
+        # Feedforward 權重
         if param_config.get("num_experts", 0) > 0:
-            # Load router (gating) weights
+            # 載入 router（gating）權重
             block.ff.gate.weight = assign(
                 block.ff.gate.weight,
                 params[f"model.layers.{l}.mlp.gate.weight"],
                 f"model.layers.{l}.mlp.gate.weight"
             )
-            # Load expert weights
+            # 載入 expert 權重
             for e in range(param_config["num_experts"]):
                 prefix = f"model.layers.{l}.mlp.experts.{e}"
                 block.ff.fc1[e].weight = assign(
@@ -562,7 +562,7 @@ def load_weights_into_qwen(model, param_config, params):
             f"model.layers.{l}.post_attention_layernorm.weight"
         )
 
-    # Final normalization and output head
+    # 最後的正規化與輸出 head
     model.final_norm.scale = assign(model.final_norm.scale, params["model.norm.weight"], "model.norm.weight")
 
     if "lm_head.weight" in params:
@@ -672,7 +672,7 @@ def download_from_huggingface(repo_id, filename, local_dir, revision="main"):
 
 def download_from_huggingface_from_snapshots(repo_id, local_dir):
     from huggingface_hub import hf_hub_download, snapshot_download
-    from safetensors.torch import load_file  # or your preferred loader
+    from safetensors.torch import load_file  # 或你偏好的 loader
 
     repo_dir = snapshot_download(repo_id=repo_id, local_dir=local_dir)
 
@@ -680,7 +680,7 @@ def download_from_huggingface_from_snapshots(repo_id, local_dir):
     single_file_path = os.path.join(repo_dir, "model.safetensors")
 
     if os.path.exists(index_path):
-        # Multi-shard model
+        # 分成多個 shard 的模型
         with open(index_path, "r") as f:
             index = json.load(f)
 
@@ -690,7 +690,7 @@ def download_from_huggingface_from_snapshots(repo_id, local_dir):
             shard = load_file(shard_path)
             weights_dict.update(shard)
     elif os.path.exists(single_file_path):
-        # Single-shard model
+        # 單一 shard 的模型
         weights_file = hf_hub_download(
             repo_id=repo_id,
             filename="model.safetensors",

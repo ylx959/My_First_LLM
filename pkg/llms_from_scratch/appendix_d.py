@@ -27,13 +27,13 @@ def train_model(model, train_loader, val_loader, optimizer, device,
     train_losses, val_losses, track_tokens_seen, track_lrs = [], [], [], []
     tokens_seen, global_step = 0, -1
 
-    # Retrieve the maximum learning rate from the optimizer
+    # 從 optimizer 取得最大 learning rate
     peak_lr = optimizer.param_groups[0]["lr"]
 
-    # Calculate the total number of iterations in the training process
+    # 計算訓練過程的總迭代次數
     total_training_steps = len(train_loader) * n_epochs
 
-    # Calculate the learning rate increment during the warmup phase
+    # 計算 warmup 階段 learning rate 的增量
     lr_increment = (peak_lr - initial_lr) / warmup_steps
 
     for epoch in range(n_epochs):
@@ -42,37 +42,37 @@ def train_model(model, train_loader, val_loader, optimizer, device,
             optimizer.zero_grad()
             global_step += 1
 
-            # Adjust the learning rate based on the current phase (warmup or cosine annealing)
+            # 依目前階段（warmup 或 cosine annealing）調整 learning rate
             if global_step < warmup_steps:
-                # Linear warmup
+                # 線性 warmup
                 lr = initial_lr + global_step * lr_increment
             else:
-                # Cosine annealing after warmup
+                # warmup 之後做 cosine annealing
                 progress = ((global_step - warmup_steps) /
                             (total_training_steps - warmup_steps))
                 lr = min_lr + (peak_lr - min_lr) * 0.5 * (1 + math.cos(math.pi * progress))
 
-            # Apply the calculated learning rate to the optimizer
+            # 把算好的 learning rate 套用到 optimizer
             for param_group in optimizer.param_groups:
                 param_group["lr"] = lr
-            track_lrs.append(lr)  # Store the current learning rate
+            track_lrs.append(lr)  # 儲存目前的 learning rate
 
-            # Calculate and backpropagate the loss
+            # 計算 loss 並反向傳播
             loss = calc_loss_batch(input_batch, target_batch, model, device)
             loss.backward()
 
-            # Apply gradient clipping after the warmup phase to avoid exploding gradients
+            # warmup 階段之後套用 gradient clipping，避免梯度爆炸
             if orig_book_version:
                 if global_step > warmup_steps:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             else:
-                if global_step >= warmup_steps:  # the book originally used global_step > warmup_steps, which led to a skipped clipping step after warmup
+                if global_step >= warmup_steps:  # 書中原本用 global_step > warmup_steps，導致 warmup 之後跳過一次 clipping
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             optimizer.step()
             tokens_seen += input_batch.numel()
 
-            # Periodically evaluate the model on the training and validation sets
+            # 定期在訓練集和驗證集上評估模型
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader,
@@ -81,12 +81,12 @@ def train_model(model, train_loader, val_loader, optimizer, device,
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
                 track_tokens_seen.append(tokens_seen)
-                # Print the current losses
+                # 印出目前的 loss
                 print(f"Ep {epoch+1} (Iter {global_step:06d}): "
                       f"Train loss {train_loss:.3f}, "
                       f"Val loss {val_loss:.3f}")
 
-        # Generate and print a sample from the model to monitor progress
+        # 從模型生成並印出一段樣本來監看進度
         generate_and_print_sample(
             model, tokenizer, device, start_context
         )

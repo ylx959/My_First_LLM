@@ -22,7 +22,7 @@ class IMDbDataset(Dataset):
         self.pad_token_id = pad_token_id
         self.use_attention_mask = use_attention_mask
 
-        # Pre-tokenize texts and create attention masks if required
+        # 預先 tokenize 文字，需要時建立 attention mask
         self.encoded_texts = [
             tokenizer.encode(text, truncation=True, max_length=self.max_length)
             for text in self.data["text"]
@@ -79,14 +79,14 @@ def calc_loss_batch(input_batch, attention_mask_batch, target_batch, model, devi
     return loss
 
 
-# Same as in chapter 5
+# 和第 5 章一樣
 def calc_loss_loader(data_loader, model, device, num_batches=None):
     total_loss = 0.
     if num_batches is None:
         num_batches = len(data_loader)
     else:
-        # Reduce the number of batches to match the total number of batches in the data loader
-        # if num_batches exceeds the number of batches in the data loader
+        # 減少 batch 數以符合 data loader 中的總 batch 數
+        # 如果 num_batches 超過 data loader 中的 batch 數
         num_batches = min(num_batches, len(data_loader))
     for i, (input_batch, attention_mask_batch, target_batch) in enumerate(data_loader):
         if i < num_batches:
@@ -97,7 +97,7 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
     return total_loss / num_batches
 
 
-@torch.no_grad()  # Disable gradient tracking for efficiency
+@torch.no_grad()  # 關閉梯度追蹤以提升效率
 def calc_accuracy_loader(data_loader, model, device, num_batches=None):
     model.eval()
     correct_predictions, num_examples = 0, 0
@@ -131,23 +131,23 @@ def evaluate_model(model, train_loader, val_loader, device, eval_iter):
 
 def train_classifier_simple(model, train_loader, val_loader, optimizer, device, num_epochs,
                             eval_freq, eval_iter, max_steps=None):
-    # Initialize lists to track losses and tokens seen
+    # 初始化記錄 loss 和看過 token 數的 list
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
     examples_seen, global_step = 0, -1
 
-    # Main training loop
+    # 主要訓練迴圈
     for epoch in range(num_epochs):
-        model.train()  # Set model to training mode
+        model.train()  # 把模型設為訓練模式
 
         for input_batch, attention_mask_batch, target_batch in train_loader:
-            optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
+            optimizer.zero_grad()  # 清掉上一個 batch 迭代的 loss 梯度
             loss = calc_loss_batch(input_batch, attention_mask_batch, target_batch, model, device)
-            loss.backward()  # Calculate loss gradients
-            optimizer.step()  # Update model weights using loss gradients
-            examples_seen += input_batch.shape[0]  # New: track examples instead of tokens
+            loss.backward()  # 計算 loss 的梯度
+            optimizer.step()  # 用 loss 梯度更新模型權重
+            examples_seen += input_batch.shape[0]  # 新增：記錄樣本數而不是 token 數
             global_step += 1
 
-            # Optional evaluation step
+            # 可選的評估步驟
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader, device, eval_iter)
@@ -159,7 +159,7 @@ def train_classifier_simple(model, train_loader, val_loader, optimizer, device, 
             if max_steps is not None and global_step > max_steps:
                 break
 
-        # New: Calculate accuracy after each epoch
+        # 新增：每個 epoch 結束後計算準確率
         train_accuracy = calc_accuracy_loader(train_loader, model, device, num_batches=eval_iter)
         val_accuracy = calc_accuracy_loader(val_loader, model, device, num_batches=eval_iter)
         print(f"Training accuracy: {train_accuracy*100:.2f}% | ", end="")
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ###############################
-    # Load model
+    # 載入模型
     ###############################
 
     torch.manual_seed(123)
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     model.eval()
 
     ###############################
-    # Instantiate dataloaders
+    # 建立 dataloader
     ###############################
 
     base_path = Path(".")
@@ -423,7 +423,7 @@ if __name__ == "__main__":
     )
 
     ###############################
-    # Train model
+    # 訓練模型
     ###############################
 
     start_time = time.time()
@@ -441,7 +441,7 @@ if __name__ == "__main__":
     print(f"Training completed in {execution_time_minutes:.2f} minutes.")
 
     ###############################
-    # Evaluate model
+    # 評估模型
     ###############################
 
     print("\nEvaluating on the full datasets ...\n")

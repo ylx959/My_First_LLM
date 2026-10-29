@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# This is a summary file containing the main takeaways from chapter 6.
+# 這是彙整第 6 章重點的摘要檔。
 
 import requests
 import zipfile
@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tiktoken
 import torch
-# Import Dynamo before TensorFlow is loaded by gpt_download to avoid a native
-# Triton/TensorFlow initialization crash with recent PyTorch nightly builds.
+# 在 gpt_download 載入 TensorFlow 之前先匯入 Dynamo，以避免原生
+# 近期 PyTorch nightly 版本中 Triton/TensorFlow 初始化時崩潰的問題。
 import torch._dynamo  # noqa: F401
 from torch.utils.data import Dataset, DataLoader
 
@@ -28,7 +28,7 @@ def download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path):
         print(f"{data_file_path} already exists. Skipping download and extraction.")
         return
 
-    # Downloading the file
+    # 下載檔案中
     response = requests.get(url, stream=True, timeout=60)
     response.raise_for_status()
     with open(zip_path, "wb") as out_file:
@@ -36,38 +36,38 @@ def download_and_unzip_spam_data(url, zip_path, extracted_path, data_file_path):
             if chunk:
                 out_file.write(chunk)
 
-    # Unzipping the file
+    # 解壓縮檔案
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extracted_path)
 
-    # Add .tsv file extension
+    # 加上 .tsv 副檔名
     original_file_path = Path(extracted_path) / "SMSSpamCollection"
     os.rename(original_file_path, data_file_path)
     print(f"File downloaded and saved as {data_file_path}")
 
 
 def create_balanced_dataset(df):
-    # Count the instances of "spam"
+    # 計算 "spam" 的數量
     num_spam = df[df["Label"] == "spam"].shape[0]
 
-    # Randomly sample "ham" instances to match the number of "spam" instances
+    # 隨機抽樣 "ham"，數量與 "spam" 相同
     ham_subset = df[df["Label"] == "ham"].sample(num_spam, random_state=123)
 
-    # Combine ham "subset" with "spam"
+    # 把 ham 的「子集」和 spam 合併
     balanced_df = pd.concat([ham_subset, df[df["Label"] == "spam"]])
 
     return balanced_df
 
 
 def random_split(df, train_frac, validation_frac):
-    # Shuffle the entire DataFrame
+    # 打亂整個 DataFrame
     df = df.sample(frac=1, random_state=123).reset_index(drop=True)
 
-    # Calculate split indices
+    # 計算切分的 index
     train_end = int(len(df) * train_frac)
     validation_end = train_end + int(len(df) * validation_frac)
 
-    # Split the DataFrame
+    # 切分 DataFrame
     train_df = df[:train_end]
     validation_df = df[train_end:validation_end]
     test_df = df[validation_end:]
@@ -79,7 +79,7 @@ class SpamDataset(Dataset):
     def __init__(self, csv_file, tokenizer, max_length=None, pad_token_id=50256):
         self.data = pd.read_csv(csv_file)
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = [
             tokenizer.encode(text) for text in self.data["Text"]
         ]
@@ -88,13 +88,13 @@ class SpamDataset(Dataset):
             self.max_length = self._longest_encoded_length()
         else:
             self.max_length = max_length
-            # Truncate sequences if they are longer than max_length
+            # 序列超過 max_length 就截斷
             self.encoded_texts = [
                 encoded_text[:self.max_length]
                 for encoded_text in self.encoded_texts
             ]
 
-        # Pad sequences to the longest sequence
+        # 把序列 pad 到最長序列的長度
         self.encoded_texts = [
             encoded_text + [pad_token_id] * (self.max_length - len(encoded_text))
             for encoded_text in self.encoded_texts
@@ -118,8 +118,8 @@ class SpamDataset(Dataset):
             if encoded_length > max_length:
                 max_length = encoded_length
         return max_length
-        # Note: A more pythonic version to implement this method
-        # is the following, which is also used in the next chapter:
+        # 注意：這個方法更 pythonic 的寫法
+        # 如下，下一章也會用到：
         # return max(len(encoded_text) for encoded_text in self.encoded_texts)
 
 
@@ -136,7 +136,7 @@ def calc_accuracy_loader(data_loader, model, device, num_batches=None):
             input_batch, target_batch = input_batch.to(device), target_batch.to(device)
 
             with torch.no_grad():
-                logits = model(input_batch)[:, -1, :]  # Logits of last output token
+                logits = model(input_batch)[:, -1, :]  # 最後一個輸出 token 的 logits
             predicted_labels = torch.argmax(logits, dim=-1)
 
             num_examples += predicted_labels.shape[0]
@@ -148,7 +148,7 @@ def calc_accuracy_loader(data_loader, model, device, num_batches=None):
 
 def calc_loss_batch(input_batch, target_batch, model, device):
     input_batch, target_batch = input_batch.to(device), target_batch.to(device)
-    logits = model(input_batch)[:, -1, :]  # Logits of last output token
+    logits = model(input_batch)[:, -1, :]  # 最後一個輸出 token 的 logits
     loss = torch.nn.functional.cross_entropy(logits, target_batch)
     return loss
 
@@ -181,23 +181,23 @@ def evaluate_model(model, train_loader, val_loader, device, eval_iter):
 
 def train_classifier_simple(model, train_loader, val_loader, optimizer, device, num_epochs,
                             eval_freq, eval_iter):
-    # Initialize lists to track losses and tokens seen
+    # 初始化記錄 loss 和看過 token 數的 list
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
     examples_seen, global_step = 0, -1
 
-    # Main training loop
+    # 主要訓練迴圈
     for epoch in range(num_epochs):
-        model.train()  # Set model to training mode
+        model.train()  # 把模型設為訓練模式
 
         for input_batch, target_batch in train_loader:
-            optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
+            optimizer.zero_grad()  # 清掉上一個 batch 迭代的 loss 梯度
             loss = calc_loss_batch(input_batch, target_batch, model, device)
-            loss.backward()  # Calculate loss gradients
-            optimizer.step()  # Update model weights using loss gradients
-            examples_seen += input_batch.shape[0]  # New: track examples instead of tokens
+            loss.backward()  # 計算 loss 的梯度
+            optimizer.step()  # 用 loss 梯度更新模型權重
+            examples_seen += input_batch.shape[0]  # 新增：記錄樣本數而不是 token 數
             global_step += 1
 
-            # Optional evaluation step
+            # 可選的評估步驟
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader, device, eval_iter)
@@ -206,7 +206,7 @@ def train_classifier_simple(model, train_loader, val_loader, optimizer, device, 
                 print(f"Ep {epoch+1} (Step {global_step:06d}): "
                       f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}")
 
-        # Calculate accuracy after each epoch
+        # 每個 epoch 結束後計算準確率
         train_accuracy = calc_accuracy_loader(train_loader, model, device, num_batches=eval_iter)
         val_accuracy = calc_accuracy_loader(val_loader, model, device, num_batches=eval_iter)
         print(f"Training accuracy: {train_accuracy*100:.2f}% | ", end="")
@@ -220,19 +220,19 @@ def train_classifier_simple(model, train_loader, val_loader, optimizer, device, 
 def plot_values(epochs_seen, examples_seen, train_values, val_values, label="loss"):
     fig, ax1 = plt.subplots(figsize=(5, 3))
 
-    # Plot training and validation loss against epochs
+    # 畫出訓練和驗證 loss 隨 epoch 的變化
     ax1.plot(epochs_seen, train_values, label=f"Training {label}")
     ax1.plot(epochs_seen, val_values, linestyle="-.", label=f"Validation {label}")
     ax1.set_xlabel("Epochs")
     ax1.set_ylabel(label.capitalize())
     ax1.legend()
 
-    # Create a second x-axis for tokens seen
-    ax2 = ax1.twiny()  # Create a second x-axis that shares the same y-axis
-    ax2.plot(examples_seen, train_values, alpha=0)  # Invisible plot for aligning ticks
+    # 建立第二條 x 軸顯示看過的 token 數
+    ax2 = ax1.twiny()  # 建立共用同一條 y 軸的第二條 x 軸
+    ax2.plot(examples_seen, train_values, alpha=0)  # 用來對齊刻度的隱形圖
     ax2.set_xlabel("Examples seen")
 
-    fig.tight_layout()  # Adjust layout to make room
+    fig.tight_layout()  # 調整排版留出空間
     plt.savefig(f"{label}-plot.pdf")
     # plt.show()
 
@@ -254,7 +254,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ########################################
-    # Download and prepare dataset
+    # 下載並準備資料集
     ########################################
 
     url = "https://archive.ics.uci.edu/static/public/228/sms+spam+collection.zip"
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     test_df.to_csv("test.csv", index=None)
 
     ########################################
-    # Create data loaders
+    # 建立 data loader
     ########################################
     tokenizer = tiktoken.get_encoding("gpt2")
 
@@ -329,10 +329,10 @@ if __name__ == "__main__":
     )
 
     ########################################
-    # Load pretrained model
+    # 載入預訓練模型
     ########################################
 
-    # Small GPT model for testing purposes
+    # 測試用的小型 GPT 模型
     if args.test_mode:
         BASE_CONFIG = {
             "vocab_size": 50257,
@@ -347,16 +347,16 @@ if __name__ == "__main__":
         model.eval()
         device = "cpu"
 
-    # Code as it is used in the main chapter
+    # 主章節中使用的程式碼
     else:
         CHOOSE_MODEL = "gpt2-small (124M)"
         INPUT_PROMPT = "Every effort moves"
 
         BASE_CONFIG = {
-            "vocab_size": 50257,     # Vocabulary size
+            "vocab_size": 50257,     # 詞彙表大小
             "context_length": 1024,  # Context length
-            "drop_rate": 0.0,        # Dropout rate
-            "qkv_bias": True         # Query-key-value bias
+            "drop_rate": 0.0,        # Dropout 比例
+            "qkv_bias": True         # Query-key-value 的 bias
         }
 
         model_configs = {
@@ -384,7 +384,7 @@ if __name__ == "__main__":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ########################################
-    # Modify and pretrained model
+    # 修改預訓練模型
     ########################################
 
     for param in model.parameters():
@@ -403,7 +403,7 @@ if __name__ == "__main__":
         param.requires_grad = True
 
     ########################################
-    # Finetune modified model
+    # 微調修改後的模型
     ########################################
 
     start_time = time.time()
@@ -422,15 +422,15 @@ if __name__ == "__main__":
     print(f"Training completed in {execution_time_minutes:.2f} minutes.")
 
     ########################################
-    # Plot results
+    # 畫出結果
     ########################################
 
-    # loss plot
+    # loss 圖
     epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
     examples_seen_tensor = torch.linspace(0, examples_seen, len(train_losses))
     plot_values(epochs_tensor, examples_seen_tensor, train_losses, val_losses)
 
-    # accuracy plot
+    # 準確率圖
     epochs_tensor = torch.linspace(0, num_epochs, len(train_accs))
     examples_seen_tensor = torch.linspace(0, examples_seen, len(train_accs))
     plot_values(epochs_tensor, examples_seen_tensor, train_accs, val_accs, label="accuracy")

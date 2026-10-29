@@ -62,19 +62,19 @@ class TransformerBlock(nn.Module):
         self.drop_resid = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
         x = self.drop_resid(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_resid(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -105,32 +105,32 @@ class GPTModel(nn.Module):
 
 
 def generate_text_simple(model, idx, max_new_tokens, context_size):
-    # idx is (B, T) array of indices in the current context
+    # idx 是目前 context 中 index 的 (B, T) 陣列
     for _ in range(max_new_tokens):
 
-        # Crop current context if it exceeds the supported context size
-        # E.g., if LLM supports only 5 tokens, and the context size is 10
-        # then only the last 5 tokens are used as context
+        # 如果目前的 context 超過支援的長度就截斷
+        # 例如 LLM 只支援 5 個 token，而 context 大小是 10
+        # 那就只用最後 5 個 token 作為 context
         idx_cond = idx[:, -context_size:]
 
-        # Get the predictions
+        # 取得預測結果
         with torch.no_grad():
             logits = model(idx_cond)
 
-        # Focus only on the last time step
+        # 只看最後一個時間步
         # (batch, n_token, vocab_size) becomes (batch, vocab_size)
         logits = logits[:, -1, :]
 
-        # Get the idx of the vocab entry with the highest logits value
+        # 取得 logits 值最高的詞彙 index
         idx_next = torch.argmax(logits, dim=-1, keepdim=True)  # (batch, 1)
 
-        # Append sampled index to the running sequence
+        # 把取樣到的 index 接到目前的序列後面
         idx = torch.cat((idx, idx_next), dim=1)  # (batch, n_tokens+1)
 
     return idx
 
 ######################
-# Bonus
+# 加分題
 ######################
 
 
@@ -162,19 +162,19 @@ class TransformerBlockFast(nn.Module):
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 

@@ -3,9 +3,9 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# This file collects all the relevant code that we covered thus far
-# throughout Chapters 2-6.
-# This file can be run as a standalone script.
+# 這個檔案收集了到目前為止所有相關的程式碼
+# （第 2-6 章）。
+# 這個檔案可以當作獨立腳本執行。
 
 
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ from torch.utils.data import Dataset, DataLoader
 
 
 #####################################
-# Chapter 2
+# 第 2 章
 #####################################
 
 
@@ -28,10 +28,10 @@ class GPTDatasetV1(Dataset):
         self.input_ids = []
         self.target_ids = []
 
-        # Tokenize the entire text
+        # 對整段文字做 tokenize
         token_ids = tokenizer.encode(txt, allowed_special={"<|endoftext|>"})
 
-        # Use a sliding window to chunk the book into overlapping sequences of max_length
+        # 用 sliding window 把書切成長度為 max_length 且互相重疊的序列
         for i in range(0, len(token_ids) - max_length, stride):
             input_chunk = token_ids[i:i + max_length]
             target_chunk = token_ids[i + 1: i + max_length + 1]
@@ -47,13 +47,13 @@ class GPTDatasetV1(Dataset):
 
 def create_dataloader_v1(txt, batch_size=4, max_length=256,
                          stride=128, shuffle=True, drop_last=True, num_workers=0):
-    # Initialize the tokenizer
+    # 初始化 tokenizer
     tokenizer = tiktoken.get_encoding("gpt2")
 
-    # Create dataset
+    # 建立資料集
     dataset = GPTDatasetV1(txt, tokenizer, max_length, stride)
 
-    # Create dataloader
+    # 建立 dataloader
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers)
 
@@ -61,7 +61,7 @@ def create_dataloader_v1(txt, batch_size=4, max_length=256,
 
 
 #####################################
-# Chapter 3
+# 第 3 章
 #####################################
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
@@ -70,57 +70,57 @@ class MultiHeadAttention(nn.Module):
 
         self.d_out = d_out
         self.num_heads = num_heads
-        self.head_dim = d_out // num_heads  # Reduce the projection dim to match desired output dim
+        self.head_dim = d_out // num_heads  # 縮小投影維度以符合想要的輸出維度
 
         self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
-        self.out_proj = nn.Linear(d_out, d_out)  # Linear layer to combine head outputs
+        self.out_proj = nn.Linear(d_out, d_out)  # 合併各 head 輸出的 linear 層
         self.dropout = nn.Dropout(dropout)
         self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
 
     def forward(self, x):
         b, num_tokens, d_in = x.shape
 
-        keys = self.W_key(x)  # Shape: (b, num_tokens, d_out)
+        keys = self.W_key(x)  # Shape：(b, num_tokens, d_out)
         queries = self.W_query(x)
         values = self.W_value(x)
 
-        # We implicitly split the matrix by adding a `num_heads` dimension
-        # Unroll last dim: (b, num_tokens, d_out) -> (b, num_tokens, num_heads, head_dim)
+        # 透過加上 `num_heads` 維度，隱含地切分矩陣
+        # 展開最後一維：(b, num_tokens, d_out) -> (b, num_tokens, num_heads, head_dim)
         keys = keys.view(b, num_tokens, self.num_heads, self.head_dim)
         values = values.view(b, num_tokens, self.num_heads, self.head_dim)
         queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
 
-        # Transpose: (b, num_tokens, num_heads, head_dim) -> (b, num_heads, num_tokens, head_dim)
+        # Transpose：(b, num_tokens, num_heads, head_dim) -> (b, num_heads, num_tokens, head_dim)
         keys = keys.transpose(1, 2)
         queries = queries.transpose(1, 2)
         values = values.transpose(1, 2)
 
-        # Compute scaled dot-product attention (aka self-attention) with a causal mask
-        attn_scores = queries @ keys.transpose(2, 3)  # Dot product for each head
+        # 計算帶 causal mask 的 scaled dot-product attention（也就是 self-attention）
+        attn_scores = queries @ keys.transpose(2, 3)  # 每個 head 的內積
 
-        # Original mask truncated to the number of tokens and converted to boolean
+        # 原本的 mask 截斷到 token 數，並轉成布林值
         mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
 
-        # Use the mask to fill attention scores
+        # 用 mask 填入 attention 分數
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
-        # Shape: (b, num_tokens, num_heads, head_dim)
+        # Shape：(b, num_tokens, num_heads, head_dim)
         context_vec = (attn_weights @ values).transpose(1, 2)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.reshape(b, num_tokens, self.d_out)
-        context_vec = self.out_proj(context_vec)  # optional projection
+        context_vec = self.out_proj(context_vec)  # 可選的投影
 
         return context_vec
 
 
 #####################################
-# Chapter 4
+# 第 4 章
 #####################################
 class LayerNorm(nn.Module):
     def __init__(self, emb_dim):
@@ -176,19 +176,19 @@ class TransformerBlock(nn.Module):
         self.drop_resid = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
         x = self.drop_resid(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_resid(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -219,72 +219,72 @@ class GPTModel(nn.Module):
 
 
 def generate_text_simple(model, idx, max_new_tokens, context_size):
-    # idx is (B, T) array of indices in the current context
+    # idx 是目前 context 中 index 的 (B, T) 陣列
     for _ in range(max_new_tokens):
 
-        # Crop current context if it exceeds the supported context size
-        # E.g., if LLM supports only 5 tokens, and the context size is 10
-        # then only the last 5 tokens are used as context
+        # 如果目前的 context 超過支援的長度就截斷
+        # 例如 LLM 只支援 5 個 token，而 context 大小是 10
+        # 那就只用最後 5 個 token 作為 context
         idx_cond = idx[:, -context_size:]
 
-        # Get the predictions
+        # 取得預測結果
         with torch.no_grad():
             logits = model(idx_cond)
 
-        # Focus only on the last time step
+        # 只看最後一個時間步
         # (batch, n_token, vocab_size) becomes (batch, vocab_size)
         logits = logits[:, -1, :]
 
-        # Get the idx of the vocab entry with the highest logits value
+        # 取得 logits 值最高的詞彙 index
         idx_next = torch.argmax(logits, dim=-1, keepdim=True)  # (batch, 1)
 
-        # Append sampled index to the running sequence
+        # 把取樣到的 index 接到目前的序列後面
         idx = torch.cat((idx, idx_next), dim=1)  # (batch, n_tokens+1)
 
     return idx
 
 
 #####################################
-# Chapter 5
+# 第 5 章
 #####################################
 def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=None, eos_id=None):
 
-    # For-loop is the same as before: Get logits, and only focus on last time step
+    # for 迴圈和之前一樣：取得 logits，只看最後一個時間步
     for _ in range(max_new_tokens):
         idx_cond = idx[:, -context_size:]
         with torch.no_grad():
             logits = model(idx_cond)
         logits = logits[:, -1, :]
 
-        # New: Filter logits with top_k sampling
+        # 新增：用 top_k sampling 過濾 logits
         if top_k is not None:
-            # Keep only top_k values
+            # 只保留 top_k 個值
             top_logits, _ = torch.topk(logits, top_k)
             min_val = top_logits[:, -1]
             logits = torch.where(logits < min_val, torch.tensor(float("-inf")).to(logits.device), logits)
 
-        # New: Apply temperature scaling
+        # 新增：套用 temperature 縮放
         if temperature > 0.0:
             logits = logits / temperature
 
-            # New (not in book): numerical stability tip to get equivalent results on mps device
-            # subtract rowwise max before softmax
+            # 新增（書中沒有）：數值穩定性的小技巧，讓 mps 裝置得到相同的結果
+            # softmax 之前先減掉每列的最大值
             logits = logits - logits.max(dim=-1, keepdim=True).values
 
-            # Apply softmax to get probabilities
+            # 套用 softmax 得到機率
             probs = torch.softmax(logits, dim=-1)  # (batch_size, context_len)
 
-            # Sample from the distribution
+            # 從分佈中取樣
             idx_next = torch.multinomial(probs, num_samples=1)  # (batch_size, 1)
 
-        # Otherwise same as before: get idx of the vocab entry with the highest logits value
+        # 其他和之前一樣：取得 logits 值最高的詞彙 index
         else:
             idx_next = torch.argmax(logits, dim=-1, keepdim=True)  # (batch_size, 1)
 
-        if idx_next == eos_id:  # Stop generating early if end-of-sequence token is encountered and eos_id is specified
+        if idx_next == eos_id:  # 如果遇到 end-of-sequence token 且有指定 eos_id，就提早停止生成
             break
 
-        # Same as before: append sampled index to the running sequence
+        # 和之前一樣：把取樣到的 index 接到目前的序列後面
         idx = torch.cat((idx, idx_next), dim=1)  # (batch_size, num_tokens+1)
 
     return idx
@@ -292,23 +292,23 @@ def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=No
 
 def train_model_simple(model, train_loader, val_loader, optimizer, device, num_epochs,
                        eval_freq, eval_iter, start_context, tokenizer):
-    # Initialize lists to track losses and tokens seen
+    # 初始化記錄 loss 和看過 token 數的 list
     train_losses, val_losses, track_tokens_seen = [], [], []
     tokens_seen, global_step = 0, -1
 
-    # Main training loop
+    # 主要訓練迴圈
     for epoch in range(num_epochs):
-        model.train()  # Set model to training mode
+        model.train()  # 把模型設為訓練模式
 
         for input_batch, target_batch in train_loader:
-            optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
+            optimizer.zero_grad()  # 清掉上一個 batch 迭代的 loss 梯度
             loss = calc_loss_batch(input_batch, target_batch, model, device)
-            loss.backward()  # Calculate loss gradients
-            optimizer.step()  # Update model weights using loss gradients
+            loss.backward()  # 計算 loss 的梯度
+            optimizer.step()  # 用 loss 梯度更新模型權重
             tokens_seen += input_batch.numel()
             global_step += 1
 
-            # Optional evaluation step
+            # 可選的評估步驟
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader, device, eval_iter)
@@ -318,7 +318,7 @@ def train_model_simple(model, train_loader, val_loader, optimizer, device, num_e
                 print(f"Ep {epoch+1} (Step {global_step:06d}): "
                       f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}")
 
-        # Print a sample text after each epoch
+        # 每個 epoch 結束後印出一段範例文字
         generate_and_print_sample(
             model, tokenizer, device, start_context
         )
@@ -345,7 +345,7 @@ def generate_and_print_sample(model, tokenizer, device, start_context):
             max_new_tokens=50, context_size=context_size
         )
         decoded_text = token_ids_to_text(token_ids, tokenizer)
-        print(decoded_text.replace("\n", " "))  # Compact print format
+        print(decoded_text.replace("\n", " "))  # 精簡的輸出格式
     model.train()
 
 
@@ -418,12 +418,12 @@ def load_weights_into_gpt(gpt, params):
 
 def text_to_token_ids(text, tokenizer):
     encoded = tokenizer.encode(text, allowed_special={"<|endoftext|>"})
-    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # add batch dimension
+    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # 加上 batch 維度
     return encoded_tensor
 
 
 def token_ids_to_text(token_ids, tokenizer):
-    flat = token_ids.squeeze(0)  # remove batch dimension
+    flat = token_ids.squeeze(0)  # 移除 batch 維度
     return tokenizer.decode(flat.tolist())
 
 
@@ -441,8 +441,8 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
     elif num_batches is None:
         num_batches = len(data_loader)
     else:
-        # Reduce the number of batches to match the total number of batches in the data loader
-        # if num_batches exceeds the number of batches in the data loader
+        # 減少 batch 數以符合 data loader 中的總 batch 數
+        # 如果 num_batches 超過 data loader 中的 batch 數
         num_batches = min(num_batches, len(data_loader))
     for i, (input_batch, target_batch) in enumerate(data_loader):
         if i < num_batches:
@@ -456,19 +456,19 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
 def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
     fig, ax1 = plt.subplots(figsize=(5, 3))
 
-    # Plot training and validation loss against epochs
+    # 畫出訓練和驗證 loss 隨 epoch 的變化
     ax1.plot(epochs_seen, train_losses, label="Training loss")
     ax1.plot(epochs_seen, val_losses, linestyle="-.", label="Validation loss")
     ax1.set_xlabel("Epochs")
     ax1.set_ylabel("Loss")
     ax1.legend(loc="upper right")
-    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))  # only show integer labels on x-axis
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))  # x 軸只顯示整數標籤
 
-    # Create a second x-axis for tokens seen
-    ax2 = ax1.twiny()  # Create a second x-axis that shares the same y-axis
-    ax2.plot(tokens_seen, train_losses, alpha=0)  # Invisible plot for aligning ticks
+    # 建立第二條 x 軸顯示看過的 token 數
+    ax2 = ax1.twiny()  # 建立共用同一條 y 軸的第二條 x 軸
+    ax2.plot(tokens_seen, train_losses, alpha=0)  # 用來對齊刻度的隱形圖
     ax2.set_xlabel("Tokens seen")
 
-    fig.tight_layout()  # Adjust layout to make room
+    fig.tight_layout()  # 調整排版留出空間
     plt.savefig("loss-plot.pdf")
     plt.show()

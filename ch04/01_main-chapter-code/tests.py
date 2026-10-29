@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# File for internal use (unit tests)
+# 內部使用的檔案（unit test）
 
 from gpt import main
 
@@ -32,9 +32,9 @@ def test_main(capsys):
     main()
     captured = capsys.readouterr()
 
-    # Normalize line endings and strip trailing whitespace from each line
+    # 統一換行符號，並去掉每行尾端的空白
     normalized_expected = "\n".join(line.rstrip() for line in expected.splitlines())
     normalized_output = "\n".join(line.rstrip() for line in captured.out.splitlines())
 
-    # Compare normalized strings
+    # 比較正規化後的字串
     assert normalized_output == normalized_expected

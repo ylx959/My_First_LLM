@@ -25,7 +25,7 @@ def import_notebook_defs():
 @pytest.fixture
 def dummy_input():
     torch.manual_seed(123)
-    return torch.randint(0, 100, (1, 8))  # batch size 1, seq length 8
+    return torch.randint(0, 100, (1, 8))  # batch size 為 1，序列長度 8
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def dummy_cfg_base():
     return {
         "vocab_size": 100,
         "emb_dim": 32,            # hidden_size
-        "hidden_dim": 64,         # intermediate_size (FFN)
+        "hidden_dim": 64,         # intermediate_size（FFN）
         "n_layers": 2,
         "n_heads": 4,
         "head_dim": 8,

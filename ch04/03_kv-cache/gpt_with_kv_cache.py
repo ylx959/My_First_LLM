@@ -1,6 +1,6 @@
-# This file collects all the relevant code that we covered thus far
-# throughout Chapters 3-4.
-# This file can be run as a standalone script.
+# 這個檔案收集了到目前為止所有相關的程式碼
+# （第 3-4 章）。
+# 這個檔案可以當作獨立腳本執行。
 
 import time
 import tiktoken
@@ -9,7 +9,7 @@ import torch.nn as nn
 
 
 #####################################
-# Chapter 3
+# 第 3 章
 #####################################
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
@@ -18,12 +18,12 @@ class MultiHeadAttention(nn.Module):
 
         self.d_out = d_out
         self.num_heads = num_heads
-        self.head_dim = d_out // num_heads  # Reduce the projection dim to match desired output dim
+        self.head_dim = d_out // num_heads  # 縮小投影維度以符合想要的輸出維度
 
         self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
-        self.out_proj = nn.Linear(d_out, d_out)  # Linear layer to combine head outputs
+        self.out_proj = nn.Linear(d_out, d_out)  # 合併各 head 輸出的 linear 層
         self.dropout = nn.Dropout(dropout)
         self.register_buffer(
             "mask",
@@ -32,7 +32,7 @@ class MultiHeadAttention(nn.Module):
         )
 
         ####################################################
-        # NEW
+        # 新增
         self.register_buffer("cache_k", None, persistent=False)
         self.register_buffer("cache_v", None, persistent=False)
         self.ptr_current_pos = 0
@@ -41,18 +41,18 @@ class MultiHeadAttention(nn.Module):
     def forward(self, x, use_cache=False):
         b, num_tokens, d_in = x.shape
 
-        keys_new = self.W_key(x)  # Shape: (b, num_tokens, d_out)
+        keys_new = self.W_key(x)  # Shape：(b, num_tokens, d_out)
         values_new = self.W_value(x)
         queries = self.W_query(x)
 
-        # We implicitly split the matrix by adding a `num_heads` dimension
-        # Unroll last dim: (b, num_tokens, d_out) -> (b, num_tokens, num_heads, head_dim)
+        # 透過加上 `num_heads` 維度，隱含地切分矩陣
+        # 展開最後一維：(b, num_tokens, d_out) -> (b, num_tokens, num_heads, head_dim)
         keys_new = keys_new.view(b, num_tokens, self.num_heads, self.head_dim)
         values_new = values_new.view(b, num_tokens, self.num_heads, self.head_dim)
         queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
 
         ####################################################
-        # NEW
+        # 新增
         if use_cache:
             if self.cache_k is None:
                 self.cache_k, self.cache_v = keys_new, values_new
@@ -64,16 +64,16 @@ class MultiHeadAttention(nn.Module):
             keys, values = keys_new, values_new
         ####################################################
 
-        # Transpose: (b, num_tokens, num_heads, head_dim) -> (b, num_heads, num_tokens, head_dim)
+        # Transpose：(b, num_tokens, num_heads, head_dim) -> (b, num_heads, num_tokens, head_dim)
         keys = keys.transpose(1, 2)
         queries = queries.transpose(1, 2)
         values = values.transpose(1, 2)
 
-        # Compute scaled dot-product attention (aka self-attention) with a causal mask
-        attn_scores = queries @ keys.transpose(2, 3)  # Dot product for each head
+        # 計算帶 causal mask 的 scaled dot-product attention（也就是 self-attention）
+        attn_scores = queries @ keys.transpose(2, 3)  # 每個 head 的內積
 
         ####################################################
-        # NEW
+        # 新增
         num_tokens_Q = queries.shape[-2]
         num_tokens_K = keys.shape[-2]
         if use_cache:
@@ -82,27 +82,27 @@ class MultiHeadAttention(nn.Module):
             ]
             self.ptr_current_pos += num_tokens_Q
         ####################################################
-        # Original mask truncated to the number of tokens and converted to boolean
+        # 原本的 mask 截斷到 token 數，並轉成布林值
         else:
             mask_bool = self.mask.bool()[:num_tokens_Q, :num_tokens_K]
 
-        # Use the mask to fill attention scores
+        # 用 mask 填入 attention 分數
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
-        # Shape: (b, num_tokens, num_heads, head_dim)
+        # Shape：(b, num_tokens, num_heads, head_dim)
         context_vec = (attn_weights @ values).transpose(1, 2)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)
-        context_vec = self.out_proj(context_vec)  # optional projection
+        context_vec = self.out_proj(context_vec)  # 可選的投影
 
         return context_vec
 
     ####################################################
-    # NEW
+    # 新增
     def reset_cache(self):
         self.cache_k, self.cache_v = None, None
         self.ptr_current_pos = 0
@@ -110,7 +110,7 @@ class MultiHeadAttention(nn.Module):
 
 
 #####################################
-# Chapter 4
+# 第 4 章
 #####################################
 class LayerNorm(nn.Module):
     def __init__(self, emb_dim):
@@ -166,25 +166,25 @@ class TransformerBlock(nn.Module):
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x, use_cache=False):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
 
         # x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
         ####################################################
-        # NEW
+        # 新增
         x = self.att(x, use_cache=use_cache)
         ####################################################
 
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -199,7 +199,7 @@ class GPTModel(nn.Module):
         # self.trf_blocks = nn.Sequential(
         #    *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
         ####################################################
-        # NEW
+        # 新增
         self.trf_blocks = nn.ModuleList(
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
@@ -216,7 +216,7 @@ class GPTModel(nn.Module):
         # pos_embeds = self.pos_emb(torch.arange(seq_len, device=in_idx.device))
 
         ####################################################
-        # NEW
+        # 新增
 
         if use_cache:
             pos_ids = torch.arange(self.current_pos, self.current_pos + seq_len, device=in_idx.device, dtype=torch.long)
@@ -231,7 +231,7 @@ class GPTModel(nn.Module):
 
         # x = self.trf_blocks(x)
         ####################################################
-        # NEW
+        # 新增
         for blk in self.trf_blocks:
             x = blk(x, use_cache=use_cache)
         ####################################################
@@ -241,7 +241,7 @@ class GPTModel(nn.Module):
         return logits
 
     ####################################################
-    # NEW
+    # 新增
     def reset_kv_cache(self):
         for blk in self.trf_blocks:
             blk.att.reset_cache()
@@ -250,33 +250,33 @@ class GPTModel(nn.Module):
 
 
 def generate_text_simple(model, idx, max_new_tokens, context_size):
-    # idx is (B, T) array of indices in the current context
+    # idx 是目前 context 中 index 的 (B, T) 陣列
     for _ in range(max_new_tokens):
 
-        # Crop current context if it exceeds the supported context size
-        # E.g., if LLM supports only 5 tokens, and the context size is 10
-        # then only the last 5 tokens are used as context
+        # 如果目前的 context 超過支援的長度就截斷
+        # 例如 LLM 只支援 5 個 token，而 context 大小是 10
+        # 那就只用最後 5 個 token 作為 context
         idx_cond = idx[:, -context_size:]
 
-        # Get the predictions
+        # 取得預測結果
         with torch.no_grad():
             logits = model(idx_cond)
 
-        # Focus only on the last time step
+        # 只看最後一個時間步
         # (batch, n_token, vocab_size) becomes (batch, vocab_size)
         logits = logits[:, -1, :]
 
-        # Get the idx of the vocab entry with the highest logits value
+        # 取得 logits 值最高的詞彙 index
         idx_next = torch.argmax(logits, dim=-1, keepdim=True)  # (batch, 1)
 
-        # Append sampled index to the running sequence
+        # 把取樣到的 index 接到目前的序列後面
         idx = torch.cat((idx, idx_next), dim=1)  # (batch, n_tokens+1)
 
     return idx
 
 
 ####################################################
-# NEW
+# 新增
 def generate_text_simple_cached(model, idx, max_new_tokens,
                                 context_size=None, use_cache=True):
     model.eval()
@@ -284,17 +284,17 @@ def generate_text_simple_cached(model, idx, max_new_tokens,
 
     with torch.no_grad():
         if use_cache:
-            # Init cache with full prompt
+            # 用完整的 prompt 初始化 cache
             model.reset_kv_cache()
             logits = model(idx[:, -ctx_len:], use_cache=True)
 
             for step in range(max_new_tokens):
-                # a) pick the token with the highest log-probability (greedy sampling)
+                # a) 選出 log 機率最高的 token（greedy sampling）
                 next_idx = logits[:, -1].argmax(dim=-1, keepdim=True)
-                # b) append it to the running sequence
+                # b) 把它接到目前的序列後面
                 idx = torch.cat([idx, next_idx], dim=1)
-                # c) feed model only the new token
-                if step + 1 < max_new_tokens:  # Skips the forward pass after the last token is generated
+                # c) 只把新的 token 餵給模型
+                if step + 1 < max_new_tokens:  # 生成最後一個 token 後就略過 forward pass
                     logits = model(next_idx, use_cache=True)
         else:
             for _ in range(max_new_tokens):
@@ -308,20 +308,20 @@ def generate_text_simple_cached(model, idx, max_new_tokens,
 
 def main():
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,     # 詞彙表大小
         "context_length": 1024,  # Context length
-        "emb_dim": 768,          # Embedding dimension
-        "n_heads": 12,           # Number of attention heads
-        "n_layers": 12,          # Number of layers
-        "drop_rate": 0.1,        # Dropout rate
-        "qkv_bias": False        # Query-Key-Value bias
+        "emb_dim": 768,          # Embedding 維度
+        "n_heads": 12,           # Attention head 數
+        "n_layers": 12,          # 層數
+        "drop_rate": 0.1,        # Dropout 比例
+        "qkv_bias": False        # Query-Key-Value 的 bias
     }
 
     torch.manual_seed(123)
     model = GPTModel(GPT_CONFIG_124M)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    model.eval()  # disable dropout
+    model.eval()  # 關閉 dropout
 
     start_context = "Hello, I am"
 
@@ -346,7 +346,7 @@ def main():
     # )
 
     ####################################################
-    # NEW
+    # 新增
     token_ids = generate_text_simple_cached(
         model=model,
         idx=encoded_tensor,

@@ -10,8 +10,8 @@ import time
 import pandas as pd
 import tiktoken
 import torch
-# Import Dynamo before TensorFlow is loaded by gpt_download to avoid
-# Triton/TensorFlow initialization crash on Linux aarch64
+# 在 gpt_download 載入 TensorFlow 之前先匯入 Dynamo，以避免
+# Linux aarch64 上 Triton/TensorFlow 初始化時崩潰的問題
 import torch._dynamo  # noqa: F401
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
@@ -25,12 +25,12 @@ class IMDbDataset(Dataset):
         self.data = pd.read_csv(csv_file)
         self.max_length = max_length if max_length is not None else self._longest_encoded_length(tokenizer)
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = [
             tokenizer.encode(text)[:self.max_length]
             for text in self.data["text"]
         ]
-        # Pad sequences to the longest sequence
+        # 把序列 pad 到最長序列的長度
         self.encoded_texts = [
             et + [pad_token_id] * (self.max_length - len(et))
             for et in self.encoded_texts
@@ -56,10 +56,10 @@ class IMDbDataset(Dataset):
 def instantiate_model(choose_model, load_weights):
 
     BASE_CONFIG = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,     # 詞彙表大小
         "context_length": 1024,  # Context length
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "drop_rate": 0.0,        # Dropout 比例
+        "qkv_bias": True         # Query-key-value 的 bias
     }
 
     model_configs = {
@@ -90,10 +90,10 @@ def calc_loss_batch(input_batch, target_batch, model, device,
 
     model_output = model(input_batch)
     if average_embeddings:
-        # Average over the sequence dimension (dim=1)
+        # 對序列維度（dim=1）取平均
         logits = model_output.mean(dim=1)
     else:
-        # Select embeddings at the specified token position
+        # 選出指定 token 位置的 embedding
         logits = model_output[:, trainable_token_pos, :]
 
     loss = torch.nn.functional.cross_entropy(logits, target_batch)
@@ -109,8 +109,8 @@ def calc_loss_loader(data_loader, model, device,
     elif num_batches is None:
         num_batches = len(data_loader)
     else:
-        # Reduce the number of batches to match the total number of batches in the data loader
-        # if num_batches exceeds the number of batches in the data loader
+        # 減少 batch 數以符合 data loader 中的總 batch 數
+        # 如果 num_batches 超過 data loader 中的 batch 數
         num_batches = min(num_batches, len(data_loader))
     for i, (input_batch, target_batch) in enumerate(data_loader):
         if i < num_batches:
@@ -124,7 +124,7 @@ def calc_loss_loader(data_loader, model, device,
     return total_loss / num_batches
 
 
-@torch.no_grad()  # Disable gradient tracking for efficiency
+@torch.no_grad()  # 關閉梯度追蹤以提升效率
 def calc_accuracy_loader(data_loader, model, device,
                          num_batches=None, trainable_token_pos=-1,
                          average_embeddings=False):
@@ -141,10 +141,10 @@ def calc_accuracy_loader(data_loader, model, device,
 
             model_output = model(input_batch)
             if average_embeddings:
-                # Average over the sequence dimension (dim=1)
+                # 對序列維度（dim=1）取平均
                 logits = model_output.mean(dim=1)
             else:
-                # Select embeddings at the specified token position
+                # 選出指定 token 位置的 embedding
                 logits = model_output[:, trainable_token_pos, :]
 
             predicted_labels = torch.argmax(logits, dim=-1)
@@ -210,26 +210,26 @@ def create_muon_optimizers(model, adamw_learning_rate, muon_learning_rate, weigh
 def train_classifier_simple(model, train_loader, val_loader, optimizers, device, num_epochs,
                             eval_freq, eval_iter, max_steps=None, trainable_token_pos=-1,
                             average_embeddings=False):
-    # Initialize lists to track losses and tokens seen
+    # 初始化記錄 loss 和看過 token 數的 list
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
     examples_seen, global_step = 0, -1
 
-    # Main training loop
+    # 主要訓練迴圈
     for epoch in range(num_epochs):
-        model.train()  # Set model to training mode
+        model.train()  # 把模型設為訓練模式
 
         for input_batch, target_batch in train_loader:
             for optimizer in optimizers:
-                optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
+                optimizer.zero_grad()  # 清掉上一個 batch 迭代的 loss 梯度
             loss = calc_loss_batch(input_batch, target_batch, model, device,
                                    trainable_token_pos=trainable_token_pos, average_embeddings=average_embeddings)
-            loss.backward()  # Calculate loss gradients
+            loss.backward()  # 計算 loss 的梯度
             for optimizer in optimizers:
-                optimizer.step()  # Update model weights using loss gradients
-            examples_seen += input_batch.shape[0]  # New: track examples instead of tokens
+                optimizer.step()  # 用 loss 梯度更新模型權重
+            examples_seen += input_batch.shape[0]  # 新增：記錄樣本數而不是 token 數
             global_step += 1
 
-            # Optional evaluation step
+            # 可選的評估步驟
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader, device, eval_iter,
@@ -243,7 +243,7 @@ def train_classifier_simple(model, train_loader, val_loader, optimizers, device,
             if max_steps is not None and global_step > max_steps:
                 break
 
-        # New: Calculate accuracy after each epoch
+        # 新增：每個 epoch 結束後計算準確率
         train_accuracy = calc_accuracy_loader(
             train_loader, model, device, num_batches=eval_iter,
             trainable_token_pos=trainable_token_pos, average_embeddings=average_embeddings
@@ -356,7 +356,7 @@ if __name__ == "__main__":
         raise ValueError("Invalid --trainable_token_pos argument")
 
     ###############################
-    # Load model
+    # 載入模型
     ###############################
 
     if args.weights == "pretrained":
@@ -405,7 +405,7 @@ if __name__ == "__main__":
         model = torch.compile(model)
 
     ###############################
-    # Instantiate dataloaders
+    # 建立 dataloader
     ###############################
 
     base_path = Path(".")
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     )
 
     ###############################
-    # Train model
+    # 訓練模型
     ###############################
 
     start_time = time.time()
@@ -476,7 +476,7 @@ if __name__ == "__main__":
     print(f"Training completed in {execution_time_minutes:.2f} minutes.")
 
     ###############################
-    # Evaluate model
+    # 評估模型
     ###############################
 
     print("\nEvaluating on the full datasets ...\n")

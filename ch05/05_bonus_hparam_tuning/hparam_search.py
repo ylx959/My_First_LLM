@@ -9,13 +9,13 @@ import os
 import tiktoken
 import torch
 
-# For llms_from_scratch installation instructions, see:
+# llms_from_scratch 的安裝說明請見：
 # https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
 from llms_from_scratch.ch02 import create_dataloader_v1
 from llms_from_scratch.ch04 import GPTModel
 
 
-# Define a grid of hyperparameters to search over
+# 定義要搜尋的超參數網格
 HPARAM_GRID = {
     "batch_size": [2, 4, 8, 16],
     "drop_rate": [0.0, 0.1, 0.2],
@@ -70,10 +70,10 @@ def train_model(model, train_loader, val_loader, optimizer, device,
 
     max_lr = optimizer.param_groups[0]["lr"]
 
-    # Calculate total number of iterations
+    # 計算總迭代次數
     total_training_iters = len(train_loader) * n_epochs
 
-    # Calculate the learning rate increment at each step during warmup
+    # 計算 warmup 期間每一步 learning rate 的增量
     lr_increment = (optimizer.param_groups[0]["lr"] - initial_lr) / warmup_iters
 
     for epoch in range(n_epochs):
@@ -81,25 +81,25 @@ def train_model(model, train_loader, val_loader, optimizer, device,
         for input_batch, target_batch in train_loader:
             optimizer.zero_grad()
 
-            # Increment the global step at the beginning of the iteration
+            # 在迭代開始時增加 global step
             global_step += 1
 
-            # Warmup: adjust learning rate linearly
+            # Warmup：線性調整 learning rate
             if global_step <= warmup_iters:
                 lr = initial_lr + global_step * lr_increment
-            # Cosine annealing phase
+            # Cosine annealing 階段
             else:
                 progress = (global_step - warmup_iters) / (total_training_iters - warmup_iters)
                 lr = min_lr + (max_lr - min_lr) * 0.5 * (1 + math.cos(math.pi * progress))
 
-            # Apply the calculated learning rate
+            # 套用算好的 learning rate
             for param_group in optimizer.param_groups:
                 param_group["lr"] = lr
 
             loss = calc_loss_batch(input_batch, target_batch, model, device)
             loss.backward()
 
-            # Apply gradient clipping
+            # 套用 gradient clipping
             if global_step >= warmup_iters:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
@@ -112,12 +112,12 @@ def train_model(model, train_loader, val_loader, optimizer, device,
 
 if __name__ == "__main__":
 
-    # Generate all combinations of hyperparameters
+    # 產生所有超參數組合
     hyperparameter_combinations = list(itertools.product(*HPARAM_GRID.values()))
     total_combinations = len(hyperparameter_combinations)
     print(f"Total hyperparameter configurations: {total_combinations}")
 
-    # Placeholder for the best loss and best hyperparameters
+    # 最佳 loss 和最佳超參數的佔位值
     best_val_loss = float("inf")
     best_hparams = {}
 
@@ -142,17 +142,17 @@ if __name__ == "__main__":
             current_config += 1
             print(f"Evaluating configuration {current_config} of {total_combinations}")
 
-            # Unpack the current combination of hyperparameters
+            # 取出目前這組超參數
             HPARAM_CONFIG = dict(zip(HPARAM_GRID.keys(), combination))
 
             GPT_CONFIG_124M = {
-                "vocab_size": 50257,    # Vocabulary size
-                "context_length": 256,  # Context length -- shortened from original 1024 tokens
-                "emb_dim": 768,         # Embedding dimension
-                "n_heads": 12,          # Number of attention heads
-                "n_layers": 12,         # Number of layers
+                "vocab_size": 50257,    # 詞彙表大小
+                "context_length": 256,  # Context length —— 從原本的 1024 個 token 縮短
+                "emb_dim": 768,         # Embedding 維度
+                "n_heads": 12,          # Attention head 數
+                "n_layers": 12,         # 層數
                 "drop_rate": HPARAM_CONFIG["drop_rate"],
-                "qkv_bias": False,     # Query-Key-Value bias
+                "qkv_bias": False,     # Query-Key-Value 的 bias
             }
 
             torch.manual_seed(123)
@@ -197,7 +197,7 @@ if __name__ == "__main__":
                 min_lr=HPARAM_CONFIG["min_lr"]
             )
 
-            # Log the best hyperparameters based on validation loss
+            # 根據 validation loss 記錄最佳超參數
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_train_loss = train_loss

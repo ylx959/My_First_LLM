@@ -15,16 +15,16 @@ from tiktoken.load import load_tiktoken_bpe
 
 
 LLAMA32_CONFIG_1B = {
-    "vocab_size": 128_256,           # Vocabulary size
-    "context_length": 131_072,       # Context length that was used to train the model
-    "emb_dim": 2048,                 # Embedding dimension
-    "n_heads": 32,                   # Number of attention heads
-    "n_layers": 16,                  # Number of layers
-    "hidden_dim": 8192,              # Size of the intermediate dimension in FeedForward
-    "n_kv_groups": 8,                # Key-Value groups for grouped-query attention
-    "rope_base": 500_000.0,          # The base in RoPE's "theta"
-    "dtype": torch.bfloat16,         # Lower-precision dtype to reduce memory usage
-    "rope_freq": {                   # RoPE frequency scaling
+    "vocab_size": 128_256,           # 詞彙表大小
+    "context_length": 131_072,       # 訓練模型時使用的 context length
+    "emb_dim": 2048,                 # Embedding 維度
+    "n_heads": 32,                   # Attention head 數
+    "n_layers": 16,                  # 層數
+    "hidden_dim": 8192,              # FeedForward 中間層的大小
+    "n_kv_groups": 8,                # grouped-query attention 的 Key-Value group 數
+    "rope_base": 500_000.0,          # RoPE "theta" 的 base
+    "dtype": torch.bfloat16,         # 使用較低精度的 dtype 以減少記憶體用量
+    "rope_freq": {                   # RoPE 頻率縮放
         "factor": 32.0,
         "low_freq_factor": 1.0,
         "high_freq_factor": 4.0,
@@ -33,16 +33,16 @@ LLAMA32_CONFIG_1B = {
 }
 
 LLAMA32_CONFIG_3B = {
-    "vocab_size": 128_256,           # Vocabulary size
-    "context_length": 131_072,       # Context length that was used to train the model
-    "emb_dim": 3072,                 # Embedding dimension
-    "n_heads": 24,                   # Number of attention heads
-    "n_layers": 28,                  # Number of layers
-    "hidden_dim": 8192,              # Size of the intermediate dimension in FeedForward
-    "n_kv_groups": 8,                # Key-Value groups for grouped-query attention
-    "rope_base": 500_000.0,          # The base in RoPE's "theta"
-    "dtype": torch.bfloat16,         # Lower-precision dtype to reduce memory usage
-    "rope_freq": {                   # RoPE frequency scaling
+    "vocab_size": 128_256,           # 詞彙表大小
+    "context_length": 131_072,       # 訓練模型時使用的 context length
+    "emb_dim": 3072,                 # Embedding 維度
+    "n_heads": 24,                   # Attention head 數
+    "n_layers": 28,                  # 層數
+    "hidden_dim": 8192,              # FeedForward 中間層的大小
+    "n_kv_groups": 8,                # grouped-query attention 的 Key-Value group 數
+    "rope_base": 500_000.0,          # RoPE "theta" 的 base
+    "dtype": torch.bfloat16,         # 使用較低精度的 dtype 以減少記憶體用量
+    "rope_freq": {                   # RoPE 頻率縮放
         "factor": 32.0,
         "low_freq_factor": 1.0,
         "high_freq_factor": 4.0,
@@ -55,17 +55,17 @@ class Llama3Model(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # Main model parameters
+        # 主要模型參數
         self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"], dtype=cfg["dtype"])
 
-        self.trf_blocks = nn.ModuleList(  # ModuleList since Sequential can only accept one input, and we need `x, mask, cos, sin`
+        self.trf_blocks = nn.ModuleList(  # 用 ModuleList 是因為 Sequential 只能接受一個輸入，而我們需要 `x, mask, cos, sin`
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])]
         )
 
         self.final_norm = nn.RMSNorm(cfg["emb_dim"], eps=1e-5, dtype=cfg["dtype"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False, dtype=cfg["dtype"])
 
-        # Reusable utilities
+        # 可重複使用的工具
         cos, sin = compute_rope_params(
             head_dim=cfg["emb_dim"] // cfg["n_heads"],
             theta_base=cfg["rope_base"],
@@ -75,7 +75,7 @@ class Llama3Model(nn.Module):
         self.register_buffer("cos", cos, persistent=False)
         self.register_buffer("sin", sin, persistent=False)
         self.cfg = cfg
-        self.current_pos = 0  # Track current position in KV cache
+        self.current_pos = 0  # 追蹤 KV cache 中目前的位置
 
     def forward(self, in_idx, cache=None):
         tok_embeds = self.tok_emb(in_idx)
@@ -99,7 +99,7 @@ class Llama3Model(nn.Module):
             mask = torch.triu(
                 torch.ones(num_tokens, num_tokens, device=x.device, dtype=torch.bool), diagonal=1
             )
-        # Shape (1, 1, num_tokens, num_tokens) to broadcast across batch and heads
+        # Shape (1, 1, num_tokens, num_tokens)，可 broadcast 到 batch 和 head
         mask = mask[None, None, :, :]
 
         for i, block in enumerate(self.trf_blocks):
@@ -133,17 +133,17 @@ class TransformerBlock(nn.Module):
         self.norm2 = nn.RMSNorm(cfg["emb_dim"], eps=1e-5, dtype=cfg["dtype"])
 
     def forward(self, x, mask, cos, sin, start_pos=0, cache=None):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x, next_cache = self.att(x, mask, cos, sin, start_pos=start_pos, cache=cache)  # Shape [batch_size, num_tokens, emb_size]
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x, next_cache
 
@@ -185,7 +185,7 @@ class GroupedQueryAttention(nn.Module):
     def forward(self, x, mask, cos, sin, start_pos=0, cache=None):
         b, num_tokens, _ = x.shape
 
-        # Apply projections
+        # 套用投影
         queries = self.W_query(x)  # (b, num_tokens, num_heads * head_dim)
         keys = self.W_key(x)       # (b, num_tokens, num_kv_groups * head_dim)
         values = self.W_value(x)   # (b, num_tokens, num_kv_groups * head_dim)
@@ -195,7 +195,7 @@ class GroupedQueryAttention(nn.Module):
         keys_new = keys.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
         values_new = values.view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
 
-        # Apply RoPE
+        # 套用 RoPE
         queries = apply_rope(queries, cos, sin, offset=start_pos)
         keys_new = apply_rope(keys_new, cos, sin, offset=start_pos)
 
@@ -205,37 +205,37 @@ class GroupedQueryAttention(nn.Module):
             values = torch.cat([prev_v, values_new], dim=2)
             next_cache = (keys, values)
         else:
-            start_pos = 0  # reset RoPE
+            start_pos = 0  # 重設 RoPE
             keys, values = keys_new, values_new
             next_cache = (keys, values)
 
-        # Expand keys and values to match the number of heads
-        # Shape: (b, num_heads, num_tokens, head_dim)
-        keys = keys.repeat_interleave(self.group_size, dim=1)  # Shape: (b, num_heads, num_tokens, head_dim)
-        values = values.repeat_interleave(self.group_size, dim=1)  # Shape: (b, num_heads, num_tokens, head_dim)
-        # For example, before repeat_interleave along dim=1 (query groups):
+        # 擴展 keys 和 values 以符合 head 數量
+        # Shape：(b, num_heads, num_tokens, head_dim)
+        keys = keys.repeat_interleave(self.group_size, dim=1)  # Shape：(b, num_heads, num_tokens, head_dim)
+        values = values.repeat_interleave(self.group_size, dim=1)  # Shape：(b, num_heads, num_tokens, head_dim)
+        # 例如，沿著 dim=1（query groups）做 repeat_interleave 之前：
         #   [K1, K2]
-        # After repeat_interleave (each query group is repeated group_size times):
+        # repeat_interleave 之後（每個 query group 重複 group_size 次）：
         #   [K1, K1, K2, K2]
-        # If we used regular repeat instead of repeat_interleave, we'd get:
+        # 如果用一般的 repeat 而不是 repeat_interleave，會得到：
         #   [K1, K2, K1, K2]
 
-        # Compute scaled dot-product attention (aka self-attention) with a causal mask
-        # Shape: (b, num_heads, num_tokens, num_tokens)
-        attn_scores = queries @ keys.transpose(2, 3)  # Dot product for each head
+        # 計算帶 causal mask 的 scaled dot-product attention（也就是 self-attention）
+        # Shape：(b, num_heads, num_tokens, num_tokens)
+        attn_scores = queries @ keys.transpose(2, 3)  # 每個 head 的內積
 
-        # Use the mask to fill attention scores
+        # 用 mask 填入 attention 分數
         attn_scores = attn_scores.masked_fill(mask, -torch.inf)
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
         assert keys.shape[-1] == self.head_dim
 
-        # Shape: (b, num_tokens, num_heads, head_dim)
+        # Shape：(b, num_tokens, num_heads, head_dim)
         context_vec = (attn_weights @ values).transpose(1, 2)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.reshape(b, num_tokens, self.d_out)
-        context_vec = self.out_proj(context_vec)  # optional projection
+        context_vec = self.out_proj(context_vec)  # 可選的投影
 
         return context_vec, next_cache
 
@@ -243,10 +243,10 @@ class GroupedQueryAttention(nn.Module):
 def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, freq_config=None, dtype=torch.float32):
     assert head_dim % 2 == 0, "Embedding dimension must be even"
 
-    # Compute the inverse frequencies
+    # 計算逆頻率
     inv_freq = 1.0 / (theta_base ** (torch.arange(0, head_dim, 2, dtype=dtype)[: (head_dim // 2)].float() / head_dim))
 
-    # Frequency adjustments
+    # 頻率調整
     if freq_config is not None:
         low_freq_wavelen = freq_config["original_context_length"] / freq_config["low_freq_factor"]
         high_freq_wavelen = freq_config["original_context_length"] / freq_config["high_freq_factor"]
@@ -269,16 +269,16 @@ def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, freq_c
         inv_freq_llama = torch.where(is_medium_freq, smoothed_inv_freq, inv_freq_llama)
         inv_freq = inv_freq_llama
 
-    # Generate position indices
+    # 產生位置 index
     positions = torch.arange(context_length, dtype=dtype)
 
-    # Compute the angles
-    angles = positions[:, None] * inv_freq[None, :]  # Shape: (context_length, head_dim // 2)
+    # 計算角度
+    angles = positions[:, None] * inv_freq[None, :]  # Shape：(context_length, head_dim // 2)
 
-    # Expand angles to match the head_dim
-    angles = torch.cat([angles, angles], dim=1)  # Shape: (context_length, head_dim)
+    # 擴展角度以符合 head_dim
+    angles = torch.cat([angles, angles], dim=1)  # Shape：(context_length, head_dim)
 
-    # Precompute sine and cosine
+    # 預先計算 sine 和 cosine
     cos = torch.cos(angles)
     sin = torch.sin(angles)
 
@@ -286,23 +286,23 @@ def compute_rope_params(head_dim, theta_base=10_000, context_length=4096, freq_c
 
 
 def apply_rope(x, cos, sin, offset=0):
-    # x: (batch_size, num_heads, seq_len, head_dim)
+    # x：(batch_size, num_heads, seq_len, head_dim)
     batch_size, num_heads, seq_len, head_dim = x.shape
     assert head_dim % 2 == 0, "Head dimension must be even"
 
-    # Split x into first half and second half
-    x1 = x[..., : head_dim // 2]  # First half
-    x2 = x[..., head_dim // 2:]  # Second half
+    # 把 x 拆成前半和後半
+    x1 = x[..., : head_dim // 2]  # 前半段
+    x2 = x[..., head_dim // 2:]  # 後半段
 
-    # Adjust sin and cos shapes
-    cos = cos[offset:offset + seq_len, :].unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, seq_len, head_dim)
+    # 調整 sin 和 cos 的形狀
+    cos = cos[offset:offset + seq_len, :].unsqueeze(0).unsqueeze(0)  # Shape：(1, 1, seq_len, head_dim)
     sin = sin[offset:offset + seq_len, :].unsqueeze(0).unsqueeze(0)
 
-    # Apply the rotary transformation
+    # 套用旋轉轉換
     rotated = torch.cat((-x2, x1), dim=-1)
     x_rotated = (x * cos) + (rotated * sin)
 
-    # It's ok to use lower-precision after applying cos and sin rotation
+    # 套用 cos 和 sin 旋轉之後，使用較低精度是可以的
     return x_rotated.to(dtype=x.dtype)
 
 
@@ -319,7 +319,7 @@ class Llama3Tokenizer:
 
         mergeable = load_tiktoken_bpe(model_path)
 
-        # hard-coded from Meta's tokenizer.json
+        # 從 Meta 的 tokenizer.json 寫死
         self.special = {
             "<|begin_of_text|>": 128000,
             "<|end_of_text|>": 128001,
@@ -386,7 +386,7 @@ class ChatFormat:
         ids += self.tok.encode(user_message)
         ids += [self.tok.special["<|eot_id|>"]]
 
-        # assistant header (no content yet)
+        # assistant header（還沒有內容）
         ids += self._header("assistant")
 
         return ids
@@ -396,19 +396,19 @@ class ChatFormat:
 
 
 def clean_text(text, header_end="assistant<|end_header_id|>\n\n"):
-    # Find the index of the first occurrence of "<|end_header_id|>"
+    # 找出第一次出現 "<|end_header_id|>" 的位置
     index = text.find(header_end)
 
     if index != -1:
-        # Return the substring starting after "<|end_header_id|>"
-        return text[index + len(header_end):].strip()  # Strip removes leading/trailing whitespace
+        # 回傳 "<|end_header_id|>" 之後的子字串
+        return text[index + len(header_end):].strip()  # strip 會去掉前後的空白
     else:
-        # If the token is not found, return the original text
+        # 找不到 token 的話就回傳原始文字
         return text
 
 
 ######################################################################
-# Llama 3 fast (alternative code geared towards efficiency)
+# Llama 3 快速版（著重效率的另一種寫法）
 ######################################################################
 
 class GroupedQueryAttentionFast(nn.Module):
@@ -436,26 +436,26 @@ class GroupedQueryAttentionFast(nn.Module):
     def forward(self, x, cos, sin):
         b, num_tokens, _ = x.shape
 
-        # Project to queries, keys, values
+        # 投影成 queries、keys、values
         q = self.W_query(x).view(b, num_tokens, self.num_heads, self.head_dim).transpose(1, 2)
         k = self.W_key(x).view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
         v = self.W_value(x).view(b, num_tokens, self.num_kv_groups, self.head_dim).transpose(1, 2)
 
-        # Apply Rotary Positional Embedding
+        # 套用 Rotary Positional Embedding
         q = apply_rope(q, cos, sin)
         k = apply_rope(k, cos, sin)
 
-        # Expand key/value groups to full head count
+        # 把 key/value group 擴展成完整的 head 數
         k = k.repeat_interleave(self.group_size, dim=1)
         v = v.repeat_interleave(self.group_size, dim=1)
 
-        # Efficient scaled dot-product attention
+        # 高效率的 scaled dot-product attention
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             q, k, v,
-            is_causal=True  # Enables Flash/FlexAttention kernels
+            is_causal=True  # 啟用 Flash/FlexAttention kernel
         )
 
-        # Combine heads and project
+        # 合併各 head 並投影
         attn_output = attn_output.transpose(1, 2).reshape(b, num_tokens, self.d_out)
         return self.out_proj(attn_output)
 
@@ -479,17 +479,17 @@ class TransformerBlockFast(nn.Module):
         self.norm2 = nn.RMSNorm(cfg["emb_dim"], eps=1e-5, dtype=cfg["dtype"])
 
     def forward(self, x, cos, sin):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
         x = self.att(x, cos, sin)  # Shape [batch_size, num_tokens, emb_size]
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -503,10 +503,10 @@ class Llama3ModelFast(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # Main model parameters
+        # 主要模型參數
         self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"], dtype=cfg["dtype"])
 
-        self.trf_blocks = nn.ModuleList(  # ModuleList since Sequential can only accept one input, and we need `x, cos, sin`
+        self.trf_blocks = nn.ModuleList(  # 用 ModuleList 是因為 Sequential 只能接受一個輸入，而我們需要 `x, cos, sin`
             [TransformerBlockFast(cfg) for _ in range(cfg["n_layers"])]
         )
 

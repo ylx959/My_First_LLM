@@ -18,42 +18,42 @@ from tqdm import tqdm
 
 def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=None, eos_id=None):
 
-    # For-loop is the same as before: Get logits, and only focus on last time step
+    # for 迴圈和之前一樣：取得 logits，只看最後一個時間步
     for _ in range(max_new_tokens):
         idx_cond = idx[:, -context_size:]
         with torch.no_grad():
             logits = model(idx_cond)
         logits = logits[:, -1, :]
 
-        # New: Filter logits with top_k sampling
+        # 新增：用 top_k sampling 過濾 logits
         if top_k is not None:
-            # Keep only top_k values
+            # 只保留 top_k 個值
             top_logits, _ = torch.topk(logits, top_k)
             min_val = top_logits[:, -1]
             logits = torch.where(logits < min_val, torch.tensor(float("-inf")).to(logits.device), logits)
 
-        # New: Apply temperature scaling
+        # 新增：套用 temperature 縮放
         if temperature > 0.0:
             logits = logits / temperature
 
-            # New (not in book): numerical stability tip to get equivalent results on mps device
-            # subtract rowwise max before softmax
+            # 新增（書中沒有）：數值穩定性的小技巧，讓 mps 裝置得到相同的結果
+            # softmax 之前先減掉每列的最大值
             logits = logits - logits.max(dim=-1, keepdim=True).values
 
-            # Apply softmax to get probabilities
+            # 套用 softmax 得到機率
             probs = torch.softmax(logits, dim=-1)  # (batch_size, context_len)
 
-            # Sample from the distribution
+            # 從分佈中取樣
             idx_next = torch.multinomial(probs, num_samples=1)  # (batch_size, 1)
 
-        # Otherwise same as before: get idx of the vocab entry with the highest logits value
+        # 其他和之前一樣：取得 logits 值最高的詞彙 index
         else:
             idx_next = torch.argmax(logits, dim=-1, keepdim=True)  # (batch_size, 1)
 
-        if idx_next == eos_id:  # Stop generating early if end-of-sequence token is encountered and eos_id is specified
+        if idx_next == eos_id:  # 如果遇到 end-of-sequence token 且有指定 eos_id，就提早停止生成
             break
 
-        # Same as before: append sampled index to the running sequence
+        # 和之前一樣：把取樣到的 index 接到目前的序列後面
         idx = torch.cat((idx, idx_next), dim=1)  # (batch_size, num_tokens+1)
 
     return idx
@@ -61,23 +61,23 @@ def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=No
 
 def train_model_simple(model, train_loader, val_loader, optimizer, device, num_epochs,
                        eval_freq, eval_iter, start_context, tokenizer):
-    # Initialize lists to track losses and tokens seen
+    # 初始化記錄 loss 和看過 token 數的 list
     train_losses, val_losses, track_tokens_seen = [], [], []
     tokens_seen, global_step = 0, -1
 
-    # Main training loop
+    # 主要訓練迴圈
     for epoch in range(num_epochs):
-        model.train()  # Set model to training mode
+        model.train()  # 把模型設為訓練模式
 
         for input_batch, target_batch in train_loader:
-            optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
+            optimizer.zero_grad()  # 清掉上一個 batch 迭代的 loss 梯度
             loss = calc_loss_batch(input_batch, target_batch, model, device)
-            loss.backward()  # Calculate loss gradients
-            optimizer.step()  # Update model weights using loss gradients
+            loss.backward()  # 計算 loss 的梯度
+            optimizer.step()  # 用 loss 梯度更新模型權重
             tokens_seen += input_batch.numel()
             global_step += 1
 
-            # Optional evaluation step
+            # 可選的評估步驟
             if global_step % eval_freq == 0:
                 train_loss, val_loss = evaluate_model(
                     model, train_loader, val_loader, device, eval_iter)
@@ -87,7 +87,7 @@ def train_model_simple(model, train_loader, val_loader, optimizer, device, num_e
                 print(f"Ep {epoch+1} (Step {global_step:06d}): "
                       f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}")
 
-        # Print a sample text after each epoch
+        # 每個 epoch 結束後印出一段範例文字
         generate_and_print_sample(
             model, tokenizer, device, start_context
         )
@@ -114,7 +114,7 @@ def generate_and_print_sample(model, tokenizer, device, start_context):
             max_new_tokens=50, context_size=context_size
         )
         decoded_text = token_ids_to_text(token_ids, tokenizer)
-        print(decoded_text.replace("\n", " "))  # Compact print format
+        print(decoded_text.replace("\n", " "))  # 精簡的輸出格式
     model.train()
 
 
@@ -187,12 +187,12 @@ def load_weights_into_gpt(gpt, params):
 
 def text_to_token_ids(text, tokenizer):
     encoded = tokenizer.encode(text, allowed_special={"<|endoftext|>"})
-    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # add batch dimension
+    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # 加上 batch 維度
     return encoded_tensor
 
 
 def token_ids_to_text(token_ids, tokenizer):
-    flat = token_ids.squeeze(0)  # remove batch dimension
+    flat = token_ids.squeeze(0)  # 移除 batch 維度
     return tokenizer.decode(flat.tolist())
 
 
@@ -210,8 +210,8 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
     elif num_batches is None:
         num_batches = len(data_loader)
     else:
-        # Reduce the number of batches to match the total number of batches in the data loader
-        # if num_batches exceeds the number of batches in the data loader
+        # 減少 batch 數以符合 data loader 中的總 batch 數
+        # 如果 num_batches 超過 data loader 中的 batch 數
         num_batches = min(num_batches, len(data_loader))
     for i, (input_batch, target_batch) in enumerate(data_loader):
         if i < num_batches:
@@ -225,20 +225,20 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
 def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
     fig, ax1 = plt.subplots(figsize=(5, 3))
 
-    # Plot training and validation loss against epochs
+    # 畫出訓練和驗證 loss 隨 epoch 的變化
     ax1.plot(epochs_seen, train_losses, label="Training loss")
     ax1.plot(epochs_seen, val_losses, linestyle="-.", label="Validation loss")
     ax1.set_xlabel("Epochs")
     ax1.set_ylabel("Loss")
     ax1.legend(loc="upper right")
-    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))  # only show integer labels on x-axis
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))  # x 軸只顯示整數標籤
 
-    # Create a second x-axis for tokens seen
-    ax2 = ax1.twiny()  # Create a second x-axis that shares the same y-axis
-    ax2.plot(tokens_seen, train_losses, alpha=0)  # Invisible plot for aligning ticks
+    # 建立第二條 x 軸顯示看過的 token 數
+    ax2 = ax1.twiny()  # 建立共用同一條 y 軸的第二條 x 軸
+    ax2.plot(tokens_seen, train_losses, alpha=0)  # 用來對齊刻度的隱形圖
     ax2.set_xlabel("Tokens seen")
 
-    fig.tight_layout()  # Adjust layout to make room
+    fig.tight_layout()  # 調整排版留出空間
     plt.savefig("loss-plot.pdf")
     plt.show()
 
@@ -246,12 +246,12 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
 def download_and_load_gpt2(model_size, models_dir):
     import tensorflow as tf
 
-    # Validate model size
+    # 驗證模型大小
     allowed_sizes = ("124M", "355M", "774M", "1558M")
     if model_size not in allowed_sizes:
         raise ValueError(f"Model size not in {allowed_sizes}")
 
-    # Define paths
+    # 定義路徑
     model_dir = os.path.join(models_dir, model_size)
     base_url = "https://openaipublic.blob.core.windows.net/gpt-2/models"
     backup_base_url = "https://f001.backblazeb2.com/file/LLMs-from-scratch/gpt2"
@@ -261,7 +261,7 @@ def download_and_load_gpt2(model_size, models_dir):
         "model.ckpt.meta", "vocab.bpe"
     ]
 
-    # Download files
+    # 下載檔案
     os.makedirs(model_dir, exist_ok=True)
     for filename in filenames:
         file_url = os.path.join(base_url, model_size, filename)
@@ -269,7 +269,7 @@ def download_and_load_gpt2(model_size, models_dir):
         file_path = os.path.join(model_dir, filename)
         download_file(file_url, file_path, backup_url)
 
-    # Load settings and params
+    # 載入設定和參數
     tf_ckpt_path = tf.train.latest_checkpoint(model_dir)
     settings = json.load(open(os.path.join(model_dir, "hparams.json"), "r", encoding="utf-8"))
     params = load_gpt2_params_from_tf_ckpt(tf_ckpt_path, settings)
@@ -284,7 +284,7 @@ def download_file(url, destination, backup_url=None):
 
         file_size = int(response.headers.get("Content-Length", 0))
 
-        # Check if file exists and has same size
+        # 檢查檔案是否存在且大小相同
         if os.path.exists(destination):
             file_size_local = os.path.getsize(destination)
             if file_size and file_size == file_size_local:
@@ -327,28 +327,28 @@ def download_file(url, destination, backup_url=None):
 def load_gpt2_params_from_tf_ckpt(ckpt_path, settings):
     import tensorflow as tf
 
-    # Initialize parameters dictionary with empty blocks for each layer
+    # 用每一層的空 block 初始化參數 dictionary
     params = {"blocks": [{} for _ in range(settings["n_layer"])]}
 
-    # Iterate over each variable in the checkpoint
+    # 逐一走過 checkpoint 中的每個變數
     for name, _ in tf.train.list_variables(ckpt_path):
-        # Load the variable and remove singleton dimensions
+        # 載入變數並移除大小為 1 的維度
         variable_array = np.squeeze(tf.train.load_variable(ckpt_path, name))
 
-        # Process the variable name to extract relevant parts
-        variable_name_parts = name.split("/")[1:]  # Skip the 'model/' prefix
+        # 處理變數名稱，取出需要的部分
+        variable_name_parts = name.split("/")[1:]  # 略過 'model/' 前綴
 
-        # Identify the target dictionary for the variable
+        # 找出這個變數對應的目標 dictionary
         target_dict = params
         if variable_name_parts[0].startswith("h"):
             layer_number = int(variable_name_parts[0][1:])
             target_dict = params["blocks"][layer_number]
 
-        # Recursively access or create nested dictionaries
+        # 遞迴存取或建立巢狀 dictionary
         for key in variable_name_parts[1:-1]:
             target_dict = target_dict.setdefault(key, {})
 
-        # Assign the variable array to the last key
+        # 把變數陣列指派給最後一個 key
         last_key = variable_name_parts[-1]
         target_dict[last_key] = variable_array
 

@@ -3,13 +3,13 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# This file collects all the relevant code that we covered thus far
-# throughout Chapters 3-4, adapted to use DeepSeek Sparse Attention (DSA).
-# This file can be run as a standalone script.
+# 這個檔案收集了到目前為止所有相關的程式碼
+# （第 3-4 章），改用 DeepSeek Sparse Attention（DSA）。
+# 這個檔案可以當作獨立腳本執行。
 
-# DSA is introduced in DeepSeek-V3.2:
+# DSA 在 DeepSeek-V3.2 中提出：
 #   https://huggingface.co/deepseek-ai/DeepSeek-V3.2
-# Technical report:
+# 技術報告：
 #   https://huggingface.co/deepseek-ai/DeepSeek-V3.2/resolve/main/assets/paper.pdf
 
 import argparse
@@ -20,19 +20,19 @@ import torch.nn as nn
 
 
 #####################################
-# DeepSeek Sparse Attention (DSA)
+# DeepSeek Sparse Attention（DSA）
 #####################################
-# DSA combines two components:
-#   1. A Lightning Indexer that scores all past tokens for each query
-#      using a lightweight gated sum of ReLU(q · k) dot products.
-#   2. A Token Selector that picks the top-K highest-scoring past tokens
-#      and masks out the rest.
+# DSA 由兩個部分組成：
+#   1. Lightning Indexer：為每個 query 對所有過去的 token 打分數
+#      使用 ReLU(q · k) 內積的輕量 gated 加總。
+#   2. Token Selector：挑出分數最高的 top-K 個過去 token
+#      並遮蔽其餘部分。
 #
-# This teaching implementation applies a dense mask to standard attention.
-# It reproduces the DSA selection logic but does not include a fused sparse
-# attention kernel that would reduce attention compute from O(L^2) to O(L*k).
+# 這個教學用實作把 dense mask 套用在標準 attention 上。
+# 它重現了 DSA 的選取邏輯，但不包含融合的稀疏
+# 能把 attention 運算從 O(L^2) 降到 O(L*k) 的 attention kernel。
 #
-# Reference implementation inspired by:
+# 參考實作的靈感來自：
 #   https://huggingface.co/deepseek-ai/DeepSeek-V3.2-Exp/blob/main/inference/model.py
 
 
@@ -58,49 +58,49 @@ class LightningIndexer(nn.Module):
         self.index_n_heads = index_n_heads
         self.index_head_dim = index_head_dim
 
-        # Project input to indexer query vectors: (d_model -> index_n_heads * index_head_dim)
+        # 把輸入投影成 indexer 的 query 向量：(d_model -> index_n_heads * index_head_dim)
         self.W_q_index = nn.Linear(d_model, index_n_heads * index_head_dim, bias=False)
-        # Project input to shared key vectors: (d_model -> index_head_dim)
+        # 把輸入投影成共用的 key 向量：(d_model -> index_head_dim)
         self.W_k_index = nn.Linear(d_model, index_head_dim, bias=False)
-        # Learn a per-head weight scalar: (d_model -> index_n_heads), as in the V3.2 paper
+        # 學習每個 head 的權重純量：(d_model -> index_n_heads)，同 V3.2 論文
         self.W_weights = nn.Linear(d_model, index_n_heads, bias=False)
 
         self.scale = index_head_dim ** -0.5
 
     def forward(
         self,
-        x: torch.Tensor,         # (b, T, d_model)  current token(s)
-        x_ctx: torch.Tensor,     # (b, S, d_model)  all past + current tokens
+        x: torch.Tensor,         # (b, T, d_model)  目前的 token
+        x_ctx: torch.Tensor,     # (b, S, d_model)  所有過去 + 目前的 token
         topk: int,
-        causal_mask: torch.Tensor | None = None,  # (T, S) float mask
+        causal_mask: torch.Tensor | None = None,  # (T, S) 浮點數 mask
     ) -> torch.Tensor:
         """Return top-K token indices shape (b, T, topk)."""
         b, T, _ = x.shape
         _, S, _ = x_ctx.shape
 
-        # Indexer queries: (b, T, H_I, head_dim)
+        # Indexer 的 queries：(b, T, H_I, head_dim)
         q = self.W_q_index(x).view(b, T, self.index_n_heads, self.index_head_dim)
-        # Indexer keys: (b, S, head_dim)
+        # Indexer 的 keys：(b, S, head_dim)
         k = self.W_k_index(x_ctx)  # (b, S, head_dim)
 
-        # ReLU(q · k^T) for each head: (b, T, H_I, S)
-        # k: (b, S, head_dim) -> (b, 1, S, head_dim) for broadcast
+        # 每個 head 的 ReLU(q · k^T)：(b, T, H_I, S)
+        # k：(b, S, head_dim) -> (b, 1, S, head_dim)，用於 broadcast
         raw = torch.einsum("bthd,bsd->bths", q, k) * self.scale  # (b, T, H_I, S)
         raw = torch.relu(raw)
 
-        # Per-head learned gates: (b, T, H_I)
-        # Reference implementations use raw learned gates scaled by sqrt(H_I),
-        # not a probability distribution over index heads.
+        # 每個 head 學到的 gate：(b, T, H_I)
+        # 參考實作使用學到的原始 gate，並乘上 sqrt(H_I) 縮放，
+        # 不是各 index head 上的機率分佈。
         w = self.W_weights(x)  # (b, T, H_I)
         w = w * (self.index_n_heads ** -0.5)
 
-        # Weighted sum over heads -> index scores (b, T, S)
+        # 對各 head 加權總和 -> index 分數 (b, T, S)
         index_scores = torch.einsum("bth,bths->bts", w, raw)  # (b, T, S)
 
         if causal_mask is not None:
-            index_scores = index_scores + causal_mask  # broadcast over batch
+            index_scores = index_scores + causal_mask  # 對 batch 做 broadcast
 
-        # Select top-K positions. topk is capped at available context length S.
+        # 選出 top-K 個位置。topk 上限為可用的 context length S。
         k_val = min(topk, S)
         topk_indices = index_scores.topk(k_val, dim=-1).indices  # (b, T, k)
         return topk_indices
@@ -153,10 +153,10 @@ class MultiHeadAttentionWithDSA(nn.Module):
         self.indexer = LightningIndexer(d_in, index_n_heads, index_head_dim)
 
         ####################################################
-        # KV cache-related code
+        # KV cache 相關程式碼
         self.register_buffer("cache_k", None, persistent=False)
         self.register_buffer("cache_v", None, persistent=False)
-        # Keep raw input tokens for the indexer key projection
+        # 保留原始輸入 token 給 indexer 的 key 投影使用
         self.register_buffer("cache_x", None, persistent=False)
         self.ptr_current_pos = 0
         ####################################################
@@ -174,13 +174,13 @@ class MultiHeadAttentionWithDSA(nn.Module):
         keys_new = self.W_key(x)
         values_new = self.W_value(x)
 
-        # Reshape to (b, T, num_heads, head_dim)
+        # Reshape 成 (b, T, num_heads, head_dim)
         queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
         keys_new = keys_new.view(b, num_tokens, self.num_heads, self.head_dim)
         values_new = values_new.view(b, num_tokens, self.num_heads, self.head_dim)
 
         ####################################################
-        # KV cache-related
+        # KV cache 相關
         if use_cache:
             if self.cache_k is None:
                 keys = keys_new
@@ -204,54 +204,54 @@ class MultiHeadAttentionWithDSA(nn.Module):
             k_start = 0
         ####################################################
 
-        # Transpose: (b, T, num_heads, head_dim) -> (b, num_heads, T, head_dim)
+        # Transpose：(b, T, num_heads, head_dim) -> (b, num_heads, T, head_dim)
         queries_t = queries.transpose(1, 2)
         keys_t = keys.transpose(1, 2)
         values_t = values.transpose(1, 2)
 
-        # Full scaled dot-product attention scores: (b, num_heads, T_q, T_k)
+        # 完整的 scaled dot-product attention 分數：(b, num_heads, T_q, T_k)
         attn_scores = queries_t @ keys_t.transpose(2, 3)
 
         num_tokens_Q = queries_t.shape[-2]
         num_tokens_K = keys_t.shape[-2]
         device = x.device
 
-        # ---- Build causal mask (float, -inf for masked positions) ----
+        # ---- 建立 causal mask（浮點數，被遮蔽的位置為 -inf）----
         q_positions = torch.arange(q_start, q_start + num_tokens_Q, device=device, dtype=torch.long)
         k_positions = torch.arange(k_start, k_start + num_tokens_K, device=device, dtype=torch.long)
         causal_bool = q_positions.unsqueeze(-1) < k_positions.unsqueeze(0)  # (T_q, T_k)
         causal_float = torch.zeros(num_tokens_Q, num_tokens_K, device=device, dtype=attn_scores.dtype)
         causal_float.masked_fill_(causal_bool, float("-inf"))
 
-        # ---- DSA: Lightning Indexer → sparse mask ----
-        # The indexer receives the current queries (x) and all context tokens (x_ctx).
-        # causal_float is passed so future tokens are excluded from index selection.
+        # ---- DSA：Lightning Indexer → 稀疏 mask ----
+        # indexer 會接收目前的 queries（x）和所有 context token（x_ctx）。
+        # 傳入 causal_float，讓未來的 token 不會被選進 index。
         topk_indices = self.indexer(x, x_ctx, self.topk, causal_mask=causal_float)
-        # topk_indices: (b, T_q, k)
+        # topk_indices：(b, T_q, k)
 
-        # Build sparse mask: -inf everywhere, 0 at selected positions
+        # 建立稀疏 mask：全部設為 -inf，被選中的位置設為 0
         sparse_mask = torch.full(
             (b, num_tokens_Q, num_tokens_K), float("-inf"), device=device, dtype=attn_scores.dtype
         )
         sparse_mask.scatter_(-1, topk_indices, 0.0)  # (b, T_q, T_k)
 
-        # Combine causal mask and sparse mask, then broadcast over heads
+        # 合併 causal mask 和稀疏 mask，再 broadcast 到各個 head
         combined_mask = causal_float.unsqueeze(0) + sparse_mask  # (b, T_q, T_k)
         attn_scores = attn_scores + combined_mask.unsqueeze(1)  # (b, num_heads, T_q, T_k)
 
         attn_weights = torch.softmax(attn_scores / self.head_dim ** 0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
-        # Shape: (b, num_heads, T_q, head_dim)
+        # Shape：(b, num_heads, T_q, head_dim)
         context_vec = attn_weights @ values_t
-        # Transpose and reshape: (b, T_q, d_out)
+        # Transpose 再 reshape：(b, T_q, d_out)
         context_vec = context_vec.transpose(1, 2).contiguous().view(b, num_tokens, self.d_out)
         context_vec = self.out_proj(context_vec)
         return context_vec
 
 
 #####################################
-# Chapter 4
+# 第 4 章
 #####################################
 class LayerNorm(nn.Module):
     def __init__(self, emb_dim):
@@ -310,24 +310,24 @@ class TransformerBlock(nn.Module):
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x, use_cache=False):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
 
         ####################################################
-        # KV cache-related
+        # KV cache 相關
         x = self.att(x, use_cache=use_cache)
         ####################################################
 
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -340,7 +340,7 @@ class GPTModel(nn.Module):
         self.drop_emb = nn.Dropout(cfg["drop_rate"])
 
         ####################################################
-        # KV cache-related
+        # KV cache 相關
         self.trf_blocks = nn.ModuleList(
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
@@ -355,7 +355,7 @@ class GPTModel(nn.Module):
         tok_embeds = self.tok_emb(in_idx)
 
         ####################################################
-        # KV cache-related
+        # KV cache 相關
         if use_cache:
             pos_ids = torch.arange(self.current_pos, self.current_pos + seq_len, device=in_idx.device, dtype=torch.long)
             self.current_pos += seq_len
@@ -368,7 +368,7 @@ class GPTModel(nn.Module):
         x = self.drop_emb(x)
 
         ####################################################
-        # KV cache-related
+        # KV cache 相關
         for blk in self.trf_blocks:
             x = blk(x, use_cache=use_cache)
         ####################################################
@@ -378,7 +378,7 @@ class GPTModel(nn.Module):
         return logits
 
     ####################################################
-    # KV cache-related
+    # KV cache 相關
     def reset_kv_cache(self):
         for blk in self.trf_blocks:
             blk.att.reset_cache()
@@ -393,17 +393,17 @@ def generate_text_simple_cached(model, idx, max_new_tokens,
 
     with torch.no_grad():
         if use_cache:
-            # Init cache with full prompt
+            # 用完整的 prompt 初始化 cache
             model.reset_kv_cache()
             logits = model(idx[:, -ctx_len:], use_cache=True)
 
             for step in range(max_new_tokens):
-                # a) pick the token with the highest log-probability (greedy sampling)
+                # a) 選出 log 機率最高的 token（greedy sampling）
                 next_idx = logits[:, -1].argmax(dim=-1, keepdim=True)
-                # b) append it to the running sequence
+                # b) 把它接到目前的序列後面
                 idx = torch.cat([idx, next_idx], dim=1)
-                # c) feed model only the new token
-                if step + 1 < max_new_tokens:  # Skips the forward pass after the last token is generated
+                # c) 只把新的 token 餵給模型
+                if step + 1 < max_new_tokens:  # 生成最後一個 token 後就略過 forward pass
                     logits = model(next_idx, use_cache=True)
         else:
             for _ in range(max_new_tokens):
@@ -438,13 +438,13 @@ def main():
     encoded = tokenizer.encode(start_context)
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,        # Vocabulary size
+        "vocab_size": 50257,        # 詞彙表大小
         "context_length": args.max_new_tokens + len(encoded),
-        "emb_dim": args.emb_dim,    # Embedding dimension
-        "n_heads": args.n_heads,    # Number of attention heads
-        "n_layers": args.n_layers,  # Number of layers
-        "drop_rate": 0.0,           # Dropout rate
-        "qkv_bias": False,          # Query-Key-Value bias
+        "emb_dim": args.emb_dim,    # Embedding 維度
+        "n_heads": args.n_heads,    # Attention head 數
+        "n_layers": args.n_layers,  # 層數
+        "drop_rate": 0.0,           # Dropout 比例
+        "qkv_bias": False,          # Query-Key-Value 的 bias
         "index_n_heads": args.index_n_heads,
         "index_head_dim": args.index_head_dim,
         "topk": args.topk,
@@ -454,7 +454,7 @@ def main():
     model = GPTModel(GPT_CONFIG_124M)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device, dtype=torch.bfloat16)
-    model.eval()  # disable dropout
+    model.eval()  # 關閉 dropout
 
     encoded_tensor = torch.tensor(encoded, device=device).unsqueeze(0)
     print(f"\n{50*'='}\n{22*' '}IN\n{50*'='}")

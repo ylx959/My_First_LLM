@@ -23,7 +23,7 @@ def generate_text_simple(model, idx, max_new_tokens, context_size=None, use_cach
             for step in range(max_new_tokens):
                 next_idx = logits[:, -1].argmax(dim=-1, keepdim=True)
                 idx = torch.cat([idx, next_idx], dim=1)
-                if step + 1 < max_new_tokens:  # Skips the forward pass after the last token is generated
+                if step + 1 < max_new_tokens:  # 生成最後一個 token 後就略過 forward pass
                     logits = model(next_idx, cache=cache)
         else:
             for _ in range(max_new_tokens):
@@ -35,7 +35,7 @@ def generate_text_simple(model, idx, max_new_tokens, context_size=None, use_cach
 
 
 def generate_text_simple_stream(model, token_ids, max_new_tokens, eos_token_id=None, context_size=None):
-    # context_size is accepted for backward compatibility and has no effect.
+    # context_size 是為了向下相容而保留，沒有作用。
     if context_size is not None:
         warnings.warn(
             "context_size is ignored by this streaming generator. Prompts are not "
@@ -49,7 +49,7 @@ def generate_text_simple_stream(model, token_ids, max_new_tokens, eos_token_id=N
         cache = KVCache(n_layers=model.cfg["n_layers"])
         model.reset_kv_cache()
 
-        # Prime the cache with the initial context
+        # 用初始 context 預熱 cache
         logits = model(token_ids, cache=cache)
 
         for step in range(max_new_tokens):
@@ -62,6 +62,6 @@ def generate_text_simple_stream(model, token_ids, max_new_tokens, eos_token_id=N
 
             token_ids = torch.cat([token_ids, next_token], dim=1)
 
-            # Feed only the new token to the model; cache handles history
-            if step + 1 < max_new_tokens:  # Skips the forward pass after the last token is generated
+            # 只把新的 token 餵給模型；歷史交給 cache 處理
+            if step + 1 < max_new_tokens:  # 生成最後一個 token 後就略過 forward pass
                 logits = model(next_token, cache=cache)

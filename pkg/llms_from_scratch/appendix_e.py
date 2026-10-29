@@ -11,7 +11,7 @@ class LoRALayer(torch.nn.Module):
     def __init__(self, in_dim, out_dim, rank, alpha):
         super().__init__()
         self.A = torch.nn.Parameter(torch.empty(in_dim, rank))
-        torch.nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))  # similar to standard weight initialization
+        torch.nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))  # 類似標準的權重初始化
         self.B = torch.nn.Parameter(torch.zeros(rank, out_dim))
         self.alpha = alpha
         self.rank = rank
@@ -37,8 +37,8 @@ class LinearWithLoRA(torch.nn.Module):
 def replace_linear_with_lora(model, rank, alpha):
     for name, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
-            # Replace the Linear layer with LinearWithLoRA
+            # 把 Linear 層換成 LinearWithLoRA
             setattr(model, name, LinearWithLoRA(module, rank, alpha))
         else:
-            # Recursively apply the same function to child modules
+            # 遞迴地對子 module 套用同一個函式
             replace_linear_with_lora(module, rank, alpha)

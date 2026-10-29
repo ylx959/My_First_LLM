@@ -25,7 +25,7 @@ def import_notebook_defs():
 @pytest.fixture
 def dummy_input():
     torch.manual_seed(123)
-    return torch.randint(0, 100, (1, 8))  # batch size 1, seq length 8
+    return torch.randint(0, 100, (1, 8))  # batch size 為 1，序列長度 8
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def test_notebook_rejected_decode_preserves_cache(context_model_setup):
     with pytest.raises(ValueError, match=r"Sequence length 9 exceeds .*8 tokens"):
         model(tokens[:, -2:], cache=cache)
 
-    # The failed call must leave enough room for the final valid token.
+    # 失敗的呼叫必須為最後一個有效 token 留足空間。
     actual = model(tokens[:, -1:], cache=cache)
     expected = model(tokens)[:, -1:]
     torch.testing.assert_close(actual, expected, rtol=1e-5, atol=1e-5)
@@ -107,7 +107,7 @@ def test_dummy_qwen3_forward(dummy_cfg_base, dummy_input, import_notebook_defs):
 def test_qwen3_base_equivalence_with_transformers(import_notebook_defs):
     from transformers import Qwen3Config, Qwen3ForCausalLM
 
-    # Tiny config so the test is fast
+    # 很小的設定，讓測試跑得快
     cfg = {
         "vocab_size": 257,
         "context_length": 8,

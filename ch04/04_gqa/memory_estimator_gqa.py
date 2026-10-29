@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# KV-cache memory estimator for MHA vs GQA
+# MHA 與 GQA 的 KV-cache 記憶體估算
 
 
 import argparse

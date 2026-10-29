@@ -3,9 +3,9 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# Sliding Window Attention (SWA) memory usage vs context length plot.
+# Sliding Window Attention（SWA）記憶體用量與 context length 的關係圖。
 #
-# This script mirrors the style and structure of plot_memory_estimates_mla.py.
+# 這個腳本沿用 plot_memory_estimates_mla.py 的風格和結構。
 
 import argparse
 from pathlib import Path
@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-# Bytes per element
+# 每個元素的 bytes 數
 DTYPE_BYTES = {
     "fp32": 4,
     "bf16": 2,
@@ -29,7 +29,7 @@ def convert_bytes_to_gb(n_bytes):
 
 
 def parse_ratio(ratio_str):
-    # "--swa_ratio a:b" means a SWA layers for every b full layers within a block
+    # "--swa_ratio a:b" 表示每個 block 中，每 b 個 full attention 層搭配 a 個 SWA 層
     try:
         a_str, b_str = ratio_str.split(":")
         a, b = int(a_str), int(b_str)
@@ -40,7 +40,7 @@ def parse_ratio(ratio_str):
 
 
 def calc_kv_bytes_total_mha(batch, context_length, emb_dim, n_layers, bytes_per_elem):
-    # For MHA, n_kv_heads = n_heads, which cancels out:
+    # MHA 中，n_kv_heads = n_heads，所以會互相抵消：
     # total = B * L * E * 2 (K,V) * bytes * n_layers
     return batch * context_length * emb_dim * 2 * bytes_per_elem * n_layers
 
@@ -48,8 +48,8 @@ def calc_kv_bytes_total_mha(batch, context_length, emb_dim, n_layers, bytes_per_
 def calc_kv_bytes_total_gqa(
     batch, context_length, emb_dim, n_layers, bytes_per_elem, n_kv_groups
 ):
-    # For GQA, n_kv_heads = n_heads / n_kv_groups
-    # => scale the MHA total by 1 / n_kv_groups
+    # GQA 中，n_kv_heads = n_heads / n_kv_groups
+    # => 把 MHA 的總量乘上 1 / n_kv_groups
     base = calc_kv_bytes_total_mha(batch, context_length, emb_dim, n_layers, bytes_per_elem)
     return base / n_kv_groups
 
@@ -57,7 +57,7 @@ def calc_kv_bytes_total_gqa(
 def calc_kv_bytes_total_mha_swa(
     batch, context_length, emb_dim, n_layers, bytes_per_elem, window, swa_ratio
 ):
-    # Split layers into SWA vs Full
+    # 把層分成 SWA 和 Full
     a, b = parse_ratio(swa_ratio)
     total_blocks = a + b
     n_swa_layers = int(round(n_layers * (a / total_blocks)))

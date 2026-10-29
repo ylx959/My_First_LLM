@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# Code to run the exercises; see exercise-solutions.ipynb for more information
+# 執行練習題的程式碼；詳見 exercise-solutions.ipynb
 
 from functools import partial
 from importlib.metadata import version
@@ -21,7 +21,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-# Import from local files in this folder
+# 從這個資料夾的本機檔案匯入
 from gpt_download import download_and_load_gpt2
 from previous_chapters import (
     calc_loss_loader,
@@ -38,7 +38,7 @@ class InstructionDataset(Dataset):
     def __init__(self, data, tokenizer):
         self.data = data
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = []
         for entry in data:
             instruction_plus_input = format_input(entry)
@@ -59,7 +59,7 @@ class InstructionDatasetWithMasking(Dataset):
     def __init__(self, data, tokenizer):
         self.data = data
 
-        # New: Separate list for instruction lengths
+        # 新增：另外用一個 list 存 instruction 長度
         self.instruction_lengths = []
         self.encoded_texts = []
 
@@ -72,12 +72,12 @@ class InstructionDatasetWithMasking(Dataset):
                 tokenizer.encode(full_text)
             )
 
-            # New: collect instruction lengths
+            # 新增：收集 instruction 長度
             instruction_length = len(tokenizer.encode(instruction_plus_input))
             self.instruction_lengths.append(instruction_length)
 
     def __getitem__(self, index):
-        # New: return both instruction lengths and texts separately
+        # 新增：分別回傳 instruction 長度和文字
         return self.instruction_lengths[index], self.encoded_texts[index]
 
     def __len__(self):
@@ -88,12 +88,12 @@ class InstructionDatasetPhi(Dataset):
     def __init__(self, data, tokenizer):
         self.data = data
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = []
         for entry in data:
 
             ###################################################################
-            # NEW: Use `format_input_phi` and adjust the response text template
+            # 新增：使用 `format_input_phi` 並調整回應文字的 template
             instruction_plus_input = format_input_phi(entry)
             response_text = f"\n<|assistant|>:\n{entry['output']}"
             ###################################################################
@@ -125,16 +125,16 @@ class LoRALayer(torch.nn.Module):
     def __init__(self, in_dim, out_dim, rank, alpha):
         super().__init__()
         self.A = torch.nn.Parameter(torch.empty(in_dim, rank))
-        torch.nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))  # similar to standard weight initialization
+        torch.nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))  # 類似標準的權重初始化
         self.B = torch.nn.Parameter(torch.zeros(rank, out_dim))
         self.alpha = alpha
         self.rank = rank
 
     def forward(self, x):
-        # Book formula:      alpha_book * (x @ A @ B)
-        # Canonical formula: (alpha_canonical / rank) * (x @ A @ B)
-        # For the same rank and matrices, they are equal when alpha_canonical = alpha_book * rank.
-        # Here, alpha_book=16 and rank=16 give alpha_canonical=256, so 256 / 16 = 16.
+        # 書中公式：      alpha_book * (x @ A @ B)
+        # 標準公式：(alpha_canonical / rank) * (x @ A @ B)
+        # 在 rank 和矩陣相同的情況下，當 alpha_canonical = alpha_book * rank 時兩者相等。
+        # 這裡 alpha_book=16、rank=16，得到 alpha_canonical=256，所以 256 / 16 = 16。
         x = (self.alpha / self.rank) * (x @ self.A @ self.B)
         return x
 
@@ -142,10 +142,10 @@ class LoRALayer(torch.nn.Module):
 def replace_linear_with_lora(model, rank, alpha):
     for name, module in model.named_children():
         if isinstance(module, torch.nn.Linear):
-            # Replace the Linear layer with LinearWithLoRA
+            # 把 Linear 層換成 LinearWithLoRA
             setattr(model, name, LinearWithLoRA(module, rank, alpha))
         else:
-            # Recursively apply the same function to child modules
+            # 遞迴地對子 module 套用同一個函式
             replace_linear_with_lora(module, rank, alpha)
 
 
@@ -156,28 +156,28 @@ def custom_collate_fn(
     allowed_max_length=None,
     device="cpu"
 ):
-    # Find the longest sequence in the batch
+    # 找出 batch 中最長的序列
     batch_max_length = max(len(item)+1 for item in batch)
 
-    # Pad and prepare inputs and targets
+    # padding 並準備輸入和 target
     inputs_lst, targets_lst = [], []
 
     for item in batch:
         new_item = item.copy()
-        # Add an <|endoftext|> token
+        # 加入 <|endoftext|> token
         new_item += [pad_token_id]
-        # Pad sequences to max_length
+        # 把序列 pad 到 max_length
         padded = new_item + [pad_token_id] * (batch_max_length - len(new_item))
-        inputs = torch.tensor(padded[:-1])  # Truncate the last token for inputs
-        targets = torch.tensor(padded[1:])  # Shift +1 to the right for targets
+        inputs = torch.tensor(padded[:-1])  # 輸入去掉最後一個 token
+        targets = torch.tensor(padded[1:])  # target 往右移 +1
 
-        # New: Replace all but the first padding tokens in targets by ignore_index
+        # 新增：把 target 中除了第一個以外的 padding token 都換成 ignore_index
         mask = targets == pad_token_id
         indices = torch.nonzero(mask).squeeze()
         if indices.numel() > 1:
             targets[indices[1:]] = ignore_index
 
-        # New: Optionally truncate to maximum sequence length
+        # 新增：可選擇截斷到最大序列長度
         if allowed_max_length is not None:
             inputs = inputs[:allowed_max_length]
             targets = targets[:allowed_max_length]
@@ -185,7 +185,7 @@ def custom_collate_fn(
         inputs_lst.append(inputs)
         targets_lst.append(targets)
 
-    # Convert list of inputs and targets to tensors and transfer to target device
+    # 把輸入和目標的 list 轉成 tensor 並移到目標裝置
     inputs_tensor = torch.stack(inputs_lst).to(device)
     targets_tensor = torch.stack(targets_lst).to(device)
 
@@ -199,31 +199,31 @@ def custom_collate_with_masking_fn(
     allowed_max_length=None,
     device="cpu"
 ):
-    # Find the longest sequence in the batch
-    batch_max_length = max(len(item)+1 for instruction_length, item in batch)   # New: batch is now a tuple
+    # 找出 batch 中最長的序列
+    batch_max_length = max(len(item)+1 for instruction_length, item in batch)   # 新增：batch 現在是 tuple
 
-    # Pad and prepare inputs and targets
+    # padding 並準備輸入和 target
     inputs_lst, targets_lst = [], []
 
-    for instruction_length, item in batch:  # New: batch is now a tuple
+    for instruction_length, item in batch:  # 新增：batch 現在是 tuple
         new_item = item.copy()
-        # Add an <|endoftext|> token
+        # 加入 <|endoftext|> token
         new_item += [pad_token_id]
-        # Pad sequences to max_length
+        # 把序列 pad 到 max_length
         padded = new_item + [pad_token_id] * (batch_max_length - len(new_item))
-        inputs = torch.tensor(padded[:-1])  # Truncate the last token for inputs
-        targets = torch.tensor(padded[1:])  # Shift +1 to the right for targets
+        inputs = torch.tensor(padded[:-1])  # 輸入去掉最後一個 token
+        targets = torch.tensor(padded[1:])  # target 往右移 +1
 
-        # Replace all but the first padding tokens in targets by ignore_index
+        # 把 target 中除了第一個以外的 padding token 都換成 ignore_index
         mask = targets == pad_token_id
         indices = torch.nonzero(mask).squeeze()
         if indices.numel() > 1:
             targets[indices[1:]] = ignore_index
 
-        # New: Mask all input and instruction tokens in the targets
+        # 新增：在 target 中遮蔽所有輸入和 instruction 的 token
         targets[:instruction_length-1] = -100
 
-        # Optionally truncate to maximum sequence length
+        # 可選：截斷到最大序列長度
         if allowed_max_length is not None:
             inputs = inputs[:allowed_max_length]
             targets = targets[:allowed_max_length]
@@ -231,7 +231,7 @@ def custom_collate_with_masking_fn(
         inputs_lst.append(inputs)
         targets_lst.append(targets)
 
-    # Convert list of inputs and targets to tensors and transfer to target device
+    # 把輸入和目標的 list 轉成 tensor 並移到目標裝置
     inputs_tensor = torch.stack(inputs_lst).to(device)
     targets_tensor = torch.stack(targets_lst).to(device)
 
@@ -280,20 +280,20 @@ def format_input(entry):
 def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses, plot_name):
     fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    # Plot training and validation loss against epochs
+    # 畫出訓練和驗證 loss 隨 epoch 的變化
     ax1.plot(epochs_seen, train_losses, label="Training loss")
     ax1.plot(epochs_seen, val_losses, linestyle="-.", label="Validation loss")
     ax1.set_xlabel("Epochs")
     ax1.set_ylabel("Loss")
     ax1.legend(loc="upper right")
-    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))  # only show integer labels on x-axis
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))  # x 軸只顯示整數標籤
 
-    # Create a second x-axis for tokens seen
-    ax2 = ax1.twiny()  # Create a second x-axis that shares the same y-axis
-    ax2.plot(tokens_seen, train_losses, alpha=0)  # Invisible plot for aligning ticks
+    # 建立第二條 x 軸顯示看過的 token 數
+    ax2 = ax1.twiny()  # 建立共用同一條 y 軸的第二條 x 軸
+    ax2.plot(tokens_seen, train_losses, alpha=0)  # 用來對齊刻度的隱形圖
     ax2.set_xlabel("Tokens seen")
 
-    fig.tight_layout()  # Adjust layout to make room
+    fig.tight_layout()  # 調整排版留出空間
     print(f"Plot saved as {plot_name}")
     plt.savefig(plot_name)
     # plt.show()
@@ -301,26 +301,26 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses, plot_name):
 
 def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False):
     #######################################
-    # Print package versions
+    # 印出套件版本
     #######################################
     print()
     pkgs = [
-        "matplotlib",  # Plotting library
+        "matplotlib",  # 畫圖函式庫
         "tiktoken",    # Tokenizer
-        "torch",       # Deep learning library
-        "tqdm",        # Progress bar
-        "tensorflow",  # For OpenAI's pretrained weights
+        "torch",       # 深度學習函式庫
+        "tqdm",        # 進度條
+        "tensorflow",  # 給 OpenAI 預訓練權重使用
     ]
     for p in pkgs:
         print(f"{p} version: {version(p)}")
     print(50*"-")
 
     #######################################
-    # Download and prepare dataset
+    # 下載並準備資料集
     #######################################
     if alpaca52k:
-        # Use a separate file name so that the instruction-data.json that ships in
-        # this folder is not loaded instead of the 52k Alpaca dataset
+        # 使用不同的檔名，讓隨附的 instruction-data.json
+        # 會載入這個資料夾的檔案，而不是 52k 的 Alpaca 資料集
         file_path = "alpaca_data.json"
         url = "https://raw.githubusercontent.com/tatsu-lab/stanford_alpaca/main/alpaca_data.json"
     else:
@@ -328,8 +328,8 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
         url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch07/01_main-chapter-code/instruction-data.json"
     data = download_and_load_file(file_path, url)
 
-    train_portion = int(len(data) * 0.85)  # 85% for training
-    test_portion = int(len(data) * 0.1)    # 10% for testing
+    train_portion = int(len(data) * 0.85)  # 85% 用於訓練
+    test_portion = int(len(data) * 0.1)    # 10% 用於測試
 
     train_data = data[:train_portion]
     test_data = data[train_portion:train_portion + test_portion]
@@ -393,13 +393,13 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     )
 
     #######################################
-    # Load pretrained model
+    # 載入預訓練模型
     #######################################
     BASE_CONFIG = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,     # 詞彙表大小
         "context_length": 1024,  # Context length
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "drop_rate": 0.0,        # Dropout 比例
+        "qkv_bias": True         # Query-key-value 的 bias
     }
 
     model_configs = {
@@ -433,7 +433,7 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
 
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"Total trainable parameters after: {total_params:,}")
-        # alpha / rank = 256 / 16 = 16 preserves the book's original scaling.
+        # alpha / rank = 256 / 16 = 16，保留書中原本的縮放。
         replace_linear_with_lora(model, rank=16, alpha=256)
 
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -441,7 +441,7 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
         model.to(device)
 
     #######################################
-    # Finetuning the model
+    # 微調模型
     #######################################
     print("Initial losses")
     with torch.no_grad():
@@ -488,7 +488,7 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     print(50*"-")
 
     #######################################
-    # Saving results
+    # 儲存結果
     #######################################
     print("Generating responses")
     for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
@@ -531,7 +531,7 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
         file_name = file_name.replace(".pth", "-baseline.pth")
 
     with open(test_data_path, "w") as file:
-        json.dump(test_data, file, indent=4)  # "indent" for pretty-printing
+        json.dump(test_data, file, indent=4)  # "indent" 用來美化輸出格式
     print(f"Responses saved as {test_data_path}")
 
     torch.save(model.state_dict(), file_name)

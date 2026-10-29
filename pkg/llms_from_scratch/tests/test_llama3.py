@@ -43,7 +43,7 @@ class LitGPTRMSNorm(torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         dtype = x.dtype
         x = x.float()
-        # NOTE: the original RMSNorm paper implementation is not equivalent
+        # 注意：原始 RMSNorm 論文的實作並不等價
         norm_x = torch.mean(x * x, dim=self.dim, keepdim=True)
         x_normed = x * torch.rsqrt(norm_x + self.eps)
         weight = (1 + self.weight) if self.add_unit_offset else self.weight
@@ -61,7 +61,7 @@ def test_rope():
 
     from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding, apply_rotary_pos_emb
 
-    # Settings
+    # 設定
     batch_size = 1
     context_len = 8192
     num_heads = 4
@@ -75,7 +75,7 @@ def test_rope():
         "original_context_length": 8192,
     }
 
-    # Instantiate RoPE parameters
+    # 建立 RoPE 參數
     cos, sin = compute_rope_params(
         head_dim=head_dim,
         theta_base=rope_theta,
@@ -83,16 +83,16 @@ def test_rope():
         freq_config=rope_config,
     )
 
-    # Dummy query and key tensors
+    # 假的 query 和 key tensor
     torch.manual_seed(123)
     queries = torch.randn(batch_size, num_heads, context_len, head_dim)
     keys = torch.randn(batch_size, num_heads, context_len, head_dim)
 
-    # Apply rotary position embeddings
+    # 套用 rotary position embedding
     queries_rot = apply_rope(queries, cos, sin)
     keys_rot = apply_rope(keys, cos, sin)
 
-    # Generate reference RoPE via HF
+    # 透過 HF 產生參考用的 RoPE
     hf_rope_params = {
         "factor": 8.0,
         "low_freq_factor": 1.0,
@@ -112,7 +112,7 @@ def test_rope():
         num_attention_heads = num_heads
 
         def __init__(self):
-            # Transformers >=5.0.0 expects `rope_parameters` on the instance.
+            # Transformers >=5.0.0 預期 instance 上有 `rope_parameters`。
             self.rope_parameters = {**hf_rope_params, "rope_theta": rope_theta}
 
         def standardize_rope_params(self):
@@ -121,7 +121,7 @@ def test_rope():
                 params["rope_type"] = getattr(self, "rope_type", "default")
             if "rope_theta" not in params:
                 params["rope_theta"] = getattr(self, "rope_theta")
-            # Handle older key name used in this repo.
+            # 處理這個 repo 以前使用的 key 名稱。
             if (
                 "original_max_position_embeddings" not in params
                 and "original_context_length" in params
@@ -144,13 +144,13 @@ def test_rope():
 
 
 GPT_CONFIG_124M = {
-    "vocab_size": 50257,     # Vocabulary size
+    "vocab_size": 50257,     # 詞彙表大小
     "context_length": 1024,  # Context length
-    "emb_dim": 768,          # Embedding dimension
-    "n_heads": 12,           # Number of attention heads
-    "n_layers": 12,          # Number of layers
-    "drop_rate": 0.1,        # Dropout rate
-    "qkv_bias": False        # Query-Key-Value bias
+    "emb_dim": 768,          # Embedding 維度
+    "n_heads": 12,           # Attention head 數
+    "n_layers": 12,          # 層數
+    "drop_rate": 0.1,        # Dropout 比例
+    "qkv_bias": False        # Query-Key-Value 的 bias
 }
 
 
@@ -171,20 +171,20 @@ def test_grouped_query_attention_equivalence():
         }
     )
 
-    # Causal mask for the slow version
+    # 慢速版本用的 causal mask
     mask = torch.triu(torch.ones(t, t, dtype=torch.bool), diagonal=1)
 
     attn1 = GroupedQueryAttention(d_in, d_out, num_heads, num_kv_groups)
     attn2 = GroupedQueryAttentionFast(d_in, d_out, num_heads, num_kv_groups)
 
-    # Copy weights to make both models identical
+    # 複製權重讓兩個模型完全相同
     attn2.load_state_dict(attn1.state_dict())
 
-    # Run both
+    # 兩個都跑
     y1 = attn1(x, mask, cos, sin)
     y2 = attn2(x, cos, sin)
 
-    # Compare outputs
+    # 比較輸出
     max_diff = (y1 - y2).abs().max().item()
     print(f"Max difference between slow and fast outputs: {max_diff:.4e}")
     assert torch.allclose(y1, y2, atol=1e-4)
@@ -211,7 +211,7 @@ def llama3_weights_path(tmp_path_factory):
 @pytest.mark.parametrize("generate_fn", [generate_text_simple, generate_text_simple_cached])
 def test_model_variants(ModelClass, generate_fn, llama3_weights_path):
 
-    # Skip incompatible combinations
+    # 略過不相容的組合
     if generate_fn is generate_text_simple and getattr(ModelClass, "reset_kv_cache", False):
         return
     if generate_fn is generate_text_simple_cached and not getattr(ModelClass, "reset_kv_cache", False):
@@ -256,7 +256,7 @@ def test_rmsnorm_equivalence():
     rms_norm = torch.nn.RMSNorm(hidden_size, eps=1e-6)
     lit_norm = LitGPTRMSNorm(hidden_size)
 
-    # Sync weights
+    # 同步權重
     with torch.no_grad():
         lit_norm.weight.copy_(lit_norm.weight)
 

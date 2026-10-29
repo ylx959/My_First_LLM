@@ -3,9 +3,9 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# This file collects all the relevant code that we covered thus far
-# throughout Chapters 3-4, adapted to use Grouped-Query Attention (GQA).
-# This file can be run as a standalone script.
+# 這個檔案收集了到目前為止所有相關的程式碼
+# （第 3-4 章），改用 Grouped-Query Attention（GQA）。
+# 這個檔案可以當作獨立腳本執行。
 
 import argparse
 import time
@@ -15,7 +15,7 @@ import torch.nn as nn
 
 
 #####################################
-# NEW: GQA instead of MHA
+# 新增：用 GQA 取代 MHA
 #####################################
 class GroupedQueryAttention(nn.Module):
     def __init__(
@@ -45,7 +45,7 @@ class GroupedQueryAttention(nn.Module):
     def forward(self, x, use_cache=False):
         b, num_tokens, _ = x.shape
 
-        # Apply projections
+        # 套用投影
         queries = self.W_query(x)  # (b, num_tokens, num_heads * head_dim)
         keys = self.W_key(x)       # (b, num_tokens, num_kv_groups * head_dim)
         values = self.W_value(x)   # (b, num_tokens, num_kv_groups * head_dim)
@@ -68,20 +68,20 @@ class GroupedQueryAttention(nn.Module):
                 self.cache_k, self.cache_v = None, None
                 self.ptr_current_pos = 0
 
-        # Expand keys and values to match the number of heads
-        # Shape: (b, num_heads, num_tokens, head_dim)
-        keys = keys_base.repeat_interleave(self.group_size, dim=1)  # Shape: (b, num_heads, num_tokens, head_dim)
-        values = values_base.repeat_interleave(self.group_size, dim=1)  # Shape: (b, num_heads, num_tokens, head_dim)
-        # For example, before repeat_interleave along dim=1 (query groups):
+        # 擴展 keys 和 values 以符合 head 數量
+        # Shape：(b, num_heads, num_tokens, head_dim)
+        keys = keys_base.repeat_interleave(self.group_size, dim=1)  # Shape：(b, num_heads, num_tokens, head_dim)
+        values = values_base.repeat_interleave(self.group_size, dim=1)  # Shape：(b, num_heads, num_tokens, head_dim)
+        # 例如，沿著 dim=1（query groups）做 repeat_interleave 之前：
         #   [K1, K2]
-        # After repeat_interleave (each query group is repeated group_size times):
+        # repeat_interleave 之後（每個 query group 重複 group_size 次）：
         #   [K1, K1, K2, K2]
-        # If we used regular repeat instead of repeat_interleave, we'd get:
+        # 如果用一般的 repeat 而不是 repeat_interleave，會得到：
         #   [K1, K2, K1, K2]
 
-        # Compute scaled dot-product attention (aka self-attention) with a causal mask
-        # Shape: (b, num_heads, num_tokens, num_tokens)
-        attn_scores = queries @ keys.transpose(2, 3)  # Dot product for each head
+        # 計算帶 causal mask 的 scaled dot-product attention（也就是 self-attention）
+        # Shape：(b, num_heads, num_tokens, num_tokens)
+        attn_scores = queries @ keys.transpose(2, 3)  # 每個 head 的內積
 
         ####################################################
         # causal mask
@@ -102,19 +102,19 @@ class GroupedQueryAttention(nn.Module):
         k_positions = torch.arange(num_tokens_K, device=device, dtype=torch.long)
         mask = q_positions.unsqueeze(-1) < k_positions.unsqueeze(0)
 
-        # Use the mask to fill attention scores
+        # 用 mask 填入 attention 分數
         attn_scores = attn_scores.masked_fill(mask, -torch.inf)
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
         assert keys.shape[-1] == self.head_dim
         attn_weights = self.dropout(attn_weights)
 
-        # Shape: (b, num_tokens, num_heads, head_dim)
+        # Shape：(b, num_tokens, num_heads, head_dim)
         context_vec = (attn_weights @ values).transpose(1, 2)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)
-        context_vec = self.out_proj(context_vec)  # optional projection
+        context_vec = self.out_proj(context_vec)  # 可選的投影
 
         return context_vec
 
@@ -124,7 +124,7 @@ class GroupedQueryAttention(nn.Module):
 
 
 #####################################
-# Chapter 4
+# 第 4 章
 #####################################
 class LayerNorm(nn.Module):
     def __init__(self, emb_dim):
@@ -180,25 +180,25 @@ class TransformerBlock(nn.Module):
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x, use_cache=False):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
 
         # x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         x = self.att(x, use_cache=use_cache)
         ####################################################
 
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -213,7 +213,7 @@ class GPTModel(nn.Module):
         # self.trf_blocks = nn.Sequential(
         #    *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         self.trf_blocks = nn.ModuleList(
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
@@ -230,7 +230,7 @@ class GPTModel(nn.Module):
         # pos_embeds = self.pos_emb(torch.arange(seq_len, device=in_idx.device))
 
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         if use_cache:
             pos_ids = torch.arange(self.current_pos, self.current_pos + seq_len, device=in_idx.device, dtype=torch.long)
             self.current_pos += seq_len
@@ -244,7 +244,7 @@ class GPTModel(nn.Module):
 
         # x = self.trf_blocks(x)
         ####################################################
-        # KV cache-related
+        # KV cache 相關
         for blk in self.trf_blocks:
             x = blk(x, use_cache=use_cache)
         ####################################################
@@ -254,7 +254,7 @@ class GPTModel(nn.Module):
         return logits
 
     ####################################################
-    # KV cache-related
+    # KV cache 相關
     def reset_kv_cache(self):
         for blk in self.trf_blocks:
             blk.att.reset_cache()
@@ -269,17 +269,17 @@ def generate_text_simple_cached(model, idx, max_new_tokens,
 
     with torch.no_grad():
         if use_cache:
-            # Init cache with full prompt
+            # 用完整的 prompt 初始化 cache
             model.reset_kv_cache()
             logits = model(idx[:, -ctx_len:], use_cache=True)
 
             for step in range(max_new_tokens):
-                # a) pick the token with the highest log-probability (greedy sampling)
+                # a) 選出 log 機率最高的 token（greedy sampling）
                 next_idx = logits[:, -1].argmax(dim=-1, keepdim=True)
-                # b) append it to the running sequence
+                # b) 把它接到目前的序列後面
                 idx = torch.cat([idx, next_idx], dim=1)
-                # c) feed model only the new token
-                if step + 1 < max_new_tokens:  # Skips the forward pass after the last token is generated
+                # c) 只把新的 token 餵給模型
+                if step + 1 < max_new_tokens:  # 生成最後一個 token 後就略過 forward pass
                     logits = model(next_idx, use_cache=True)
         else:
             for _ in range(max_new_tokens):
@@ -305,20 +305,20 @@ def main():
     encoded = tokenizer.encode(start_context)
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,        # Vocabulary size
+        "vocab_size": 50257,        # 詞彙表大小
         "context_length": args.max_new_tokens + len(encoded),
-        "emb_dim": args.emb_dim,    # Embedding dimension
-        "n_heads": args.n_heads,    # Number of attention heads
-        "n_layers": args.n_layers,  # Number of layers
-        "drop_rate": 0.0,           # Dropout rate
-        "qkv_bias": False,          # Query-Key-Value bias
+        "emb_dim": args.emb_dim,    # Embedding 維度
+        "n_heads": args.n_heads,    # Attention head 數
+        "n_layers": args.n_layers,  # 層數
+        "drop_rate": 0.0,           # Dropout 比例
+        "qkv_bias": False,          # Query-Key-Value 的 bias
         "n_kv_groups": args.n_kv_groups
     }
     torch.manual_seed(123)
     model = GPTModel(GPT_CONFIG_124M)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device, dtype=torch.bfloat16)
-    model.eval()  # disable dropout
+    model.eval()  # 關閉 dropout
 
     encoded_tensor = torch.tensor(encoded, device=device).unsqueeze(0)
     print(f"\n{50*'='}\n{22*' '}IN\n{50*'='}")

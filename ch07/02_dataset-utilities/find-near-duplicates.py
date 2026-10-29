@@ -12,7 +12,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-# Sample JSON dataset
+# JSON 資料集範例
 example_data = [
     {"instruction": "What is the capital of Italy?",
      "input": "", "output": "The capital of Italy is Rome."
@@ -31,9 +31,9 @@ example_data = [
 
 
 def preprocess_text(text):
-    # Lowercase the text
+    # 把文字轉成小寫
     text = text.lower()
-    # Remove punctuation
+    # 移除標點符號
     text = re.sub(r"[^\w\s]", "", text)
     return text
 
@@ -41,7 +41,7 @@ def preprocess_text(text):
 def find_near_duplicates(json_data, threshold=0.75, key="instruction"):
     """The higher the threshold, the more similar the texts have to be to match"""
 
-    # Extract instructions
+    # 取出 instruction
     text = [preprocess_text(item[key]) for item in json_data if item[key]]
     near_duplicates = []
     indices_to_remove = set()
@@ -49,14 +49,14 @@ def find_near_duplicates(json_data, threshold=0.75, key="instruction"):
     if not text:
         return {}, near_duplicates
 
-    # Vectorize the text data
+    # 把文字資料向量化
     vectorizer = TfidfVectorizer(stop_words=None, analyzer="char", ngram_range=(1, 3))
     tfidf_matrix = vectorizer.fit_transform(text)
 
-    # Compute cosine similarity between each pair of entries
+    # 計算每對項目之間的 cosine similarity
     cos_sim_matrix = cosine_similarity(tfidf_matrix)
 
-    # Find pairs of near-duplicate instructions based on the threshold
+    # 根據門檻找出幾乎重複的 instruction 配對
 
     for i in range(len(cos_sim_matrix)):
         for j in range(i+1, len(cos_sim_matrix)):
@@ -64,10 +64,10 @@ def find_near_duplicates(json_data, threshold=0.75, key="instruction"):
                 if len(json_data[i][key]) <= 1 or len(json_data[j][key]) <= 1:
                     continue
                 near_duplicates.append((json_data[i], json_data[j], cos_sim_matrix[i, j]))
-                if key in ("input", "output"):  # Don't remove duplicates based on the instruction
-                    indices_to_remove.add(j)  # Mark the second entry for removal
+                if key in ("input", "output"):  # 不要根據 instruction 移除重複項
+                    indices_to_remove.add(j)  # 標記第二筆要移除
 
-    # Remove the near-duplicate entries
+    # 移除幾乎重複的項目
     filtered_json_data = [item for index, item in enumerate(json_data) if index not in indices_to_remove]
 
     return filtered_json_data, near_duplicates

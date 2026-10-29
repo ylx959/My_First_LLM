@@ -3,7 +3,7 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 #
-# KV-cache memory estimator for MHA vs GQA vs MLA
+# MHA、GQA 與 MLA 的 KV-cache 記憶體估算
 
 import argparse
 import math
@@ -24,14 +24,14 @@ def convert_bytes(n):
 
 def calc_kv_bytes_total(batch, context_length, emb_dim, n_heads,
                              n_kv_heads, n_layers, bytes_per_elem):
-    # Generic KV-cache: per-head dim is embed_dim / n_heads, times 2 for K and V
+    # 通用 KV-cache：每個 head 的維度是 embed_dim / n_heads，K 和 V 各一份所以乘 2
     head_dim = math.ceil(emb_dim / n_heads)
     per_layer = batch * context_length * head_dim * n_kv_heads * 2 * bytes_per_elem
     return per_layer * n_layers
 
 
 def calc_mla_bytes_total(batch, context_length, n_layers, latent_dim, bytes_per_elem):
-    # Simple MLA (per-token compressed latent)
+    # 簡易版 MLA（每個 token 壓縮成 latent）
     # bytes ≈ batch × seqlen × n_layers × latent_dim × bytes_per_elem
     return batch * context_length * n_layers * latent_dim * bytes_per_elem
 

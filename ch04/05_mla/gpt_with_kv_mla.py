@@ -3,9 +3,9 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-# This file collects all the relevant code that we covered thus far
-# throughout Chapters 3-4, adapted to use Multi-Head Latent Attention (MLA).
-# This file can be run as a standalone script.
+# 這個檔案收集了到目前為止所有相關的程式碼
+# （第 3-4 章），改用 Multi-Head Latent Attention（MLA）。
+# 這個檔案可以當作獨立腳本執行。
 
 import argparse
 import time
@@ -17,7 +17,7 @@ import torch.nn as nn
 #####################################
 # Multi-Head Latent Attention
 #####################################
-# The MLA code below is inspired by
+# 下面的 MLA 程式碼參考自
 # https://huggingface.co/bird-of-paradise/deepseek-mla
 
 
@@ -32,11 +32,11 @@ class MultiHeadLatentAttention(nn.Module):
         self.head_dim = d_out // num_heads
         self.latent_dim = latent_dim if latent_dim is not None else max(16, d_out // 8)
 
-        # Projections
-        self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)              # per-head Q
-        self.W_DKV = nn.Linear(d_in, self.latent_dim, bias=qkv_bias)    # down to latent C
-        self.W_UK = nn.Linear(self.latent_dim, d_out, bias=qkv_bias)   # latent -> per-head K
-        self.W_UV = nn.Linear(self.latent_dim, d_out, bias=qkv_bias)   # latent -> per-head V
+        # 投影
+        self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)              # 每個 head 的 Q
+        self.W_DKV = nn.Linear(d_in, self.latent_dim, bias=qkv_bias)    # 降到 latent C
+        self.W_UK = nn.Linear(self.latent_dim, d_out, bias=qkv_bias)   # latent -> 每個 head 的 K
+        self.W_UV = nn.Linear(self.latent_dim, d_out, bias=qkv_bias)   # latent -> 每個 head 的 V
 
         self.out_proj = nn.Linear(d_out, d_out)
         self.dropout = nn.Dropout(dropout)
@@ -62,11 +62,11 @@ class MultiHeadLatentAttention(nn.Module):
         num_heads = self.num_heads
         head_dim = self.head_dim
 
-        # 1) Project to queries (per-token, per-head) and new latent chunk
+        # 1) 投影成 queries（每個 token、每個 head）以及新的 latent 區塊
         queries_all = self.W_query(x)  # (b, T, d_out)
         latent_new = self.W_DKV(x)  # (b, T, latent_dim)
 
-        # 2) Update latent cache and choose latent sequence to up-project
+        # 2) 更新 latent cache，並選出要 up-project 的 latent 序列
         if use_cache:
             if self.cache_c_kv is None:
                 latent_total = latent_new
@@ -76,16 +76,16 @@ class MultiHeadLatentAttention(nn.Module):
         else:
             latent_total = latent_new
 
-        # 3) Up-project latent to per-head keys/values (then split into heads)
+        # 3) 把 latent up-project 成每個 head 的 keys/values（再拆成多個 head）
         keys_all = self.W_UK(latent_total)   # (b, T_k_total, d_out)
         values_all = self.W_UV(latent_total)   # (b, T_k_total, d_out)
 
-        # 4) Reshape to heads
+        # 4) reshape 成多個 head
         queries = self._reshape_to_heads(queries_all, num_heads, head_dim)
         keys = self._reshape_to_heads(keys_all, num_heads, head_dim)
         values = self._reshape_to_heads(values_all, num_heads, head_dim)
 
-        # 5) Scaled dot-product attention with causal mask
+        # 5) 帶 causal mask 的 scaled dot-product attention
         attn_scores = torch.matmul(queries, keys.transpose(-2, -1))
 
         num_tokens_Q = queries.shape[-2]
@@ -105,18 +105,18 @@ class MultiHeadLatentAttention(nn.Module):
         k_positions = torch.arange(num_tokens_K, device=device, dtype=torch.long)
         mask_bool = q_positions.unsqueeze(-1) < k_positions.unsqueeze(0)
 
-        # Use the mask to fill attention scores
+        # 用 mask 填入 attention 分數
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
         attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
-        # Shape: (b, num_tokens, num_heads, head_dim)
+        # Shape：(b, num_tokens, num_heads, head_dim)
         context_vec = (attn_weights @ values).transpose(1, 2)
 
-        # Combine heads, where self.d_out = self.num_heads * self.head_dim
+        # 合併各 head，其中 self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)
-        context_vec = self.out_proj(context_vec)  # optional projection
+        context_vec = self.out_proj(context_vec)  # 可選的投影
 
         return context_vec
 
@@ -176,25 +176,25 @@ class TransformerBlock(nn.Module):
         self.drop_shortcut = nn.Dropout(cfg["drop_rate"])
 
     def forward(self, x, use_cache=False):
-        # Shortcut connection for attention block
+        # attention block 的 shortcut connection
         shortcut = x
         x = self.norm1(x)
 
         # x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         x = self.att(x, use_cache=use_cache)
         ####################################################
 
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
-        # Shortcut connection for feed-forward block
+        # feed-forward block 的 shortcut connection
         shortcut = x
         x = self.norm2(x)
         x = self.ff(x)
         x = self.drop_shortcut(x)
-        x = x + shortcut  # Add the original input back
+        x = x + shortcut  # 加回原始輸入
 
         return x
 
@@ -209,7 +209,7 @@ class GPTModel(nn.Module):
         # self.trf_blocks = nn.Sequential(
         #    *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         self.trf_blocks = nn.ModuleList(
             [TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
@@ -226,7 +226,7 @@ class GPTModel(nn.Module):
         # pos_embeds = self.pos_emb(torch.arange(seq_len, device=in_idx.device))
 
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         if use_cache:
             pos_ids = torch.arange(self.current_pos, self.current_pos + seq_len, device=in_idx.device, dtype=torch.long)
             self.current_pos += seq_len
@@ -240,7 +240,7 @@ class GPTModel(nn.Module):
 
         # x = self.trf_blocks(x)
         ####################################################
-        #  KV cache-related
+        #  KV cache 相關
         for blk in self.trf_blocks:
             x = blk(x, use_cache=use_cache)
         ####################################################
@@ -250,7 +250,7 @@ class GPTModel(nn.Module):
         return logits
 
     ####################################################
-    #  KV cache-related
+    #  KV cache 相關
     def reset_kv_cache(self):
         for blk in self.trf_blocks:
             blk.att.reset_cache()
@@ -265,17 +265,17 @@ def generate_text_simple_cached(model, idx, max_new_tokens,
 
     with torch.no_grad():
         if use_cache:
-            # Init cache with full prompt
+            # 用完整的 prompt 初始化 cache
             model.reset_kv_cache()
             logits = model(idx[:, -ctx_len:], use_cache=True)
 
             for step in range(max_new_tokens):
-                # a) pick the token with the highest log-probability (greedy sampling)
+                # a) 選出 log 機率最高的 token（greedy sampling）
                 next_idx = logits[:, -1].argmax(dim=-1, keepdim=True)
-                # b) append it to the running sequence
+                # b) 把它接到目前的序列後面
                 idx = torch.cat([idx, next_idx], dim=1)
-                # c) feed model only the new token
-                if step + 1 < max_new_tokens:  # Skips the forward pass after the last token is generated
+                # c) 只把新的 token 餵給模型
+                if step + 1 < max_new_tokens:  # 生成最後一個 token 後就略過 forward pass
                     logits = model(next_idx, use_cache=True)
         else:
             for _ in range(max_new_tokens):
@@ -302,20 +302,20 @@ def main():
     encoded = tokenizer.encode(start_context)
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,        # Vocabulary size
+        "vocab_size": 50257,        # 詞彙表大小
         "context_length": args.max_new_tokens + len(encoded),
-        "emb_dim": args.emb_dim,    # Embedding dimension
-        "n_heads": args.n_heads,    # Number of attention heads
-        "n_layers": args.n_layers,  # Number of layers
-        "drop_rate": 0.0,           # Dropout rate
-        "qkv_bias": False,          # Query-Key-Value bias
+        "emb_dim": args.emb_dim,    # Embedding 維度
+        "n_heads": args.n_heads,    # Attention head 數
+        "n_layers": args.n_layers,  # 層數
+        "drop_rate": 0.0,           # Dropout 比例
+        "qkv_bias": False,          # Query-Key-Value 的 bias
         "latent_dim": args.latent_dim,
     }
     torch.manual_seed(123)
     model = GPTModel(GPT_CONFIG_124M)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device, dtype=torch.bfloat16)
-    model.eval()  # disable dropout
+    model.eval()  # 關閉 dropout
 
     encoded_tensor = torch.tensor(encoded, device=device).unsqueeze(0)
     print(f"\n{50*'='}\n{22*' '}IN\n{50*'='}")

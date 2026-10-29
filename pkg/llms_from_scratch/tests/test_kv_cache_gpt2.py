@@ -145,7 +145,7 @@ def test_trimmed_prompt_uses_last_context_position(streaming, max_new_tokens, ex
         output = generate_text_simple(model, trimmed, max_new_tokens, use_cache=True)
         assert output.shape[1] == expected_prompt_length + max_new_tokens
 
-    # Generation should use the full context without overflowing it.
+    # 生成時應使用完整的 context 但不能超出。
     assert model.current_pos == TEST_CONFIG["context_length"]
 
 

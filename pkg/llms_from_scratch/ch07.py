@@ -27,11 +27,11 @@ def download_and_load_file(file_path, url):
     return data
 
 
-# The book originally used the following code below
-# However, urllib uses older protocol settings that
-# can cause problems for some readers using a VPN.
-# The `requests` version above is more robust
-# in that regard.
+# 書中原本使用下面這段程式碼
+# 不過 urllib 使用較舊的協定設定，
+# 對某些使用 VPN 的讀者會造成問題。
+# 上面的 `requests` 版本比較穩健
+# 在這方面。
 
 
 # import urllib
@@ -70,7 +70,7 @@ class InstructionDataset(Dataset):
     def __init__(self, data, tokenizer):
         self.data = data
 
-        # Pre-tokenize texts
+        # 預先 tokenize 文字
         self.encoded_texts = []
         for entry in data:
             instruction_plus_input = format_input(entry)
@@ -92,30 +92,30 @@ def custom_collate_draft_1(
     pad_token_id=50256,
     device="cpu"
 ):
-    # Find the longest sequence in the batch
-    # and increase the max length by +1, which will add one extra
-    # padding token below
+    # 找出 batch 中最長的序列
+    # 並把最大長度加 1，這會多加一個
+    # 下面的 padding token
     batch_max_length = max(len(item)+1 for item in batch)
 
-    # Pad and prepare inputs
+    # padding 並準備輸入
     inputs_lst = []
 
     for item in batch:
         new_item = item.copy()
-        # Add an <|endoftext|> token
+        # 加入 <|endoftext|> token
         new_item += [pad_token_id]
-        # Pad sequences to batch_max_length
+        # 把序列 pad 到 batch_max_length
         padded = (
             new_item + [pad_token_id] *
             (batch_max_length - len(new_item))
         )
-        # Via padded[:-1], we remove the extra padded token
-        # that has been added via the +1 setting in batch_max_length
-        # (the extra padding token will be relevant in later codes)
+        # 透過 padded[:-1] 移除多出來的 padding token
+        # 這是透過 batch_max_length 的 +1 設定加上的
+        # （多出來的 padding token 在後面的程式碼會用到）
         inputs = torch.tensor(padded[:-1])
         inputs_lst.append(inputs)
 
-    # Convert list of inputs to tensor and transfer to target device
+    # 把輸入的 list 轉成 tensor 並移到目標裝置
     inputs_tensor = torch.stack(inputs_lst).to(device)
     return inputs_tensor
 
@@ -125,27 +125,27 @@ def custom_collate_draft_2(
     pad_token_id=50256,
     device="cpu"
 ):
-    # Find the longest sequence in the batch
+    # 找出 batch 中最長的序列
     batch_max_length = max(len(item)+1 for item in batch)
 
-    # Pad and prepare inputs
+    # padding 並準備輸入
     inputs_lst, targets_lst = [], []
 
     for item in batch:
         new_item = item.copy()
-        # Add an <|endoftext|> token
+        # 加入 <|endoftext|> token
         new_item += [pad_token_id]
-        # Pad sequences to max_length
+        # 把序列 pad 到 max_length
         padded = (
             new_item + [pad_token_id] *
             (batch_max_length - len(new_item))
         )
-        inputs = torch.tensor(padded[:-1])  # Truncate the last token for inputs
-        targets = torch.tensor(padded[1:])  # Shift +1 to the right for targets
+        inputs = torch.tensor(padded[:-1])  # 輸入去掉最後一個 token
+        targets = torch.tensor(padded[1:])  # target 往右移 +1
         inputs_lst.append(inputs)
         targets_lst.append(targets)
 
-    # Convert list of inputs to tensor and transfer to target device
+    # 把輸入的 list 轉成 tensor 並移到目標裝置
     inputs_tensor = torch.stack(inputs_lst).to(device)
     targets_tensor = torch.stack(targets_lst).to(device)
     return inputs_tensor, targets_tensor
@@ -158,31 +158,31 @@ def custom_collate_fn(
     allowed_max_length=None,
     device="cpu"
 ):
-    # Find the longest sequence in the batch
+    # 找出 batch 中最長的序列
     batch_max_length = max(len(item)+1 for item in batch)
 
-    # Pad and prepare inputs and targets
+    # padding 並準備輸入和 target
     inputs_lst, targets_lst = [], []
 
     for item in batch:
         new_item = item.copy()
-        # Add an <|endoftext|> token
+        # 加入 <|endoftext|> token
         new_item += [pad_token_id]
-        # Pad sequences to max_length
+        # 把序列 pad 到 max_length
         padded = (
             new_item + [pad_token_id] *
             (batch_max_length - len(new_item))
         )
-        inputs = torch.tensor(padded[:-1])  # Truncate the last token for inputs
-        targets = torch.tensor(padded[1:])  # Shift +1 to the right for targets
+        inputs = torch.tensor(padded[:-1])  # 輸入去掉最後一個 token
+        targets = torch.tensor(padded[1:])  # target 往右移 +1
 
-        # New: Replace all but the first padding tokens in targets by ignore_index
+        # 新增：把 target 中除了第一個以外的 padding token 都換成 ignore_index
         mask = targets == pad_token_id
         indices = torch.nonzero(mask).squeeze()
         if indices.numel() > 1:
             targets[indices[1:]] = ignore_index
 
-        # New: Optionally truncate to maximum sequence length
+        # 新增：可選擇截斷到最大序列長度
         if allowed_max_length is not None:
             inputs = inputs[:allowed_max_length]
             targets = targets[:allowed_max_length]
@@ -190,7 +190,7 @@ def custom_collate_fn(
         inputs_lst.append(inputs)
         targets_lst.append(targets)
 
-    # Convert list of inputs and targets to tensors and transfer to target device
+    # 把輸入和目標的 list 轉成 tensor 並移到目標裝置
     inputs_tensor = torch.stack(inputs_lst).to(device)
     targets_tensor = torch.stack(targets_lst).to(device)
 
@@ -211,20 +211,20 @@ def query_model(
     model="llama3",
     url="http://localhost:11434/api/chat"
 ):
-    # Create the data payload as a dictionary
+    # 用 dictionary 建立要送出的資料
     data = {
         "model": model,
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "options": {     # Settings below are required for deterministic responses
+        "options": {     # 下面的設定是為了得到確定性的回應
             "seed": 123,
             "temperature": 0,
             "num_ctx": 2048
         }
     }
 
-    # Send the POST request
+    # 送出 POST 請求
     with requests.post(url, json=data, stream=True, timeout=30) as r:
         r.raise_for_status()
         response_data = ""

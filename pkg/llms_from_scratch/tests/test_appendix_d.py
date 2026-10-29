@@ -18,13 +18,13 @@ from torch.utils.data import Subset, DataLoader
 def test_train(tmp_path):
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,    # Vocabulary size
-        "context_length": 256,  # Shortened context length (orig: 1024)
-        "emb_dim": 768,         # Embedding dimension
-        "n_heads": 12,          # Number of attention heads
-        "n_layers": 12,         # Number of layers
-        "drop_rate": 0.1,       # Dropout rate
-        "qkv_bias": False       # Query-key-value bias
+        "vocab_size": 50257,    # 詞彙表大小
+        "context_length": 256,  # 縮短的 context length（原本：1024）
+        "emb_dim": 768,         # Embedding 維度
+        "n_heads": 12,          # Attention head 數
+        "n_layers": 12,         # 層數
+        "drop_rate": 0.1,       # Dropout 比例
+        "qkv_bias": False       # Query-key-value 的 bias
     }
 
     OTHER_SETTINGS = {
@@ -38,7 +38,7 @@ def test_train(tmp_path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     ##############################
-    # Download data if necessary
+    # 有需要就下載資料
     ##############################
 
     file_path = tmp_path / "the-verdict.txt"
@@ -54,17 +54,17 @@ def test_train(tmp_path):
             text_data = file.read()
 
     ##############################
-    # Initialize model
+    # 初始化模型
     ##############################
 
     model = GPTModel(GPT_CONFIG_124M)
-    model.to(device)  # no assignment model = model.to(device) necessary for nn.Module classes
+    model.to(device)  # nn.Module 類別不需要寫成 model = model.to(device)
 
     ##############################
-    # Set up dataloaders
+    # 設定 dataloader
     ##############################
 
-    # Train/validation ratio
+    # 訓練/驗證比例
     train_ratio = 0.90
     split_idx = int(train_ratio * len(text_data))
 
@@ -89,7 +89,7 @@ def test_train(tmp_path):
     )
 
     ##############################
-    # Train model
+    # 訓練模型
     ##############################
 
     tokenizer = tiktoken.get_encoding("gpt2")
@@ -99,8 +99,8 @@ def test_train(tmp_path):
     val_subset = Subset(val_loader.dataset, range(1))
     one_batch_val_loader = DataLoader(val_subset, batch_size=1)
 
-    peak_lr = 0.001  # this was originally set to 5e-4 in the book by mistake
-    optimizer = torch.optim.AdamW(model.parameters(), lr=peak_lr, weight_decay=0.1)  # the book accidentally omitted the lr assignment
+    peak_lr = 0.001  # 書中原本誤設為 5e-4
+    optimizer = torch.optim.AdamW(model.parameters(), lr=peak_lr, weight_decay=0.1)  # 書中不小心漏掉了 lr 的指派
     tokenizer = tiktoken.get_encoding("gpt2")
 
     n_epochs = 6

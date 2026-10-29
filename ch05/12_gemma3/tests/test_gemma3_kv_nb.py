@@ -25,7 +25,7 @@ def import_notebook_defs():
 @pytest.fixture
 def dummy_input():
     torch.manual_seed(123)
-    return torch.randint(0, 100, (1, 8))  # batch size 1, seq length 8
+    return torch.randint(0, 100, (1, 8))  # batch size 為 1，序列長度 8
 
 
 @pytest.fixture
@@ -38,10 +38,10 @@ def dummy_cfg_base():
         "n_heads": 4,
         "head_dim": 8,
         "n_kv_groups": 1,
-        "qk_norm": True,                # Gemma3 uses q/k RMSNorm
+        "qk_norm": True,                # Gemma3 使用 q/k RMSNorm
         "dtype": torch.float32,
-        "rope_base": 1_000_000.0,       # global RoPE base
-        "rope_local_base": 10_000.0,    # local RoPE base (unused in these tests)
+        "rope_base": 1_000_000.0,       # 全域 RoPE base
+        "rope_local_base": 10_000.0,    # 區域 RoPE base（這些測試中沒用到）
         "context_length": 64,
         "sliding_window": 16,
         "layer_types": ["full_attention", "full_attention"],
@@ -62,7 +62,7 @@ def test_dummy_gemma3_forward(dummy_cfg_base, dummy_input, import_notebook_defs)
 def test_gemma3_base_equivalence_with_transformers(import_notebook_defs):
     from transformers import Gemma3TextConfig, Gemma3ForCausalLM
 
-    # Tiny config so the test is fast
+    # 很小的設定，讓測試跑得快
     cfg = {
         "vocab_size": 257,
         "context_length": 8,

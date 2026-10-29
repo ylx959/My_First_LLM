@@ -18,7 +18,7 @@ import time
 import tiktoken
 import torch
 
-# For llms_from_scratch installation instructions, see:
+# llms_from_scratch 的安裝說明請見：
 # https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
 from llms_from_scratch.ch02 import create_dataloader_v1
 from llms_from_scratch.ch04 import GPTModel
@@ -61,7 +61,7 @@ def convert_time(seconds):
 
 
 def print_eta(start_time, book_start_time, index, total_files):
-    book_end_time = time.time()  # End time of processing this book
+    book_end_time = time.time()  # 處理完這本書的結束時間
     elapsed_time = book_end_time - book_start_time
     total_elapsed_time = book_end_time - start_time
     books_remaining = total_files - index
@@ -90,13 +90,13 @@ def train_model_simple(model, optimizer, device, n_epochs,
     try:
         for epoch in range(n_epochs):
 
-            # Iterate over the books in the training corpus
+            # 逐一走過訓練語料中的每本書
             for index, file_path in enumerate(all_files, 1):
                 book_start_time = time.time()
                 text_data = read_text_file(file_path) + " <|endoftext|> "
                 print(f"Tokenizing file {index} of {total_files}: {file_path}")
 
-                # Initialize new data loaders for each book
+                # 為每本書初始化新的 data loader
                 train_loader, val_loader = create_dataloaders(
                     text_data,
                     train_ratio=train_ratio,
@@ -115,7 +115,7 @@ def train_model_simple(model, optimizer, device, n_epochs,
                     tokens_seen += input_batch.numel()
                     global_step += 1
 
-                    # Optional evaluation step
+                    # 可選的評估步驟
                     if global_step % eval_freq == 0:
                         train_loss, val_loss = evaluate_model(
                             model, train_loader, val_loader, device, eval_iter)
@@ -125,7 +125,7 @@ def train_model_simple(model, optimizer, device, n_epochs,
                         print(f"Ep {epoch+1} (Step {global_step}): "
                               f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}")
 
-                    # Generate text passage
+                    # 生成一段文字
                     if global_step % print_sample_iter == 0:
                         generate_and_print_sample(
                             model, tokenizer, device, start_context
@@ -173,24 +173,24 @@ if __name__ == "__main__":
 
     if args.debug:
         GPT_CONFIG_124M = {
-            "vocab_size": 50257,     # Vocabulary size
+            "vocab_size": 50257,     # 詞彙表大小
             "context_length": 10,    # Context length
-            "emb_dim": 12,           # Embedding dimension
-            "n_heads": 2,            # Number of attention heads
-            "n_layers": 2,           # Number of layers
-            "drop_rate": 0.0,        # Dropout rate, deactivated via 0.0 as dropout in LLMs is not recommended anymore
-            "qkv_bias": False        # Query-key-value bias
+            "emb_dim": 12,           # Embedding 維度
+            "n_heads": 2,            # Attention head 數
+            "n_layers": 2,           # 層數
+            "drop_rate": 0.0,        # Dropout 比例，設為 0.0 關閉，因為現在已不建議在 LLM 中使用 dropout
+            "qkv_bias": False        # Query-key-value 的 bias
         }
 
     else:
         GPT_CONFIG_124M = {
-            "vocab_size": 50257,     # Vocabulary size
+            "vocab_size": 50257,     # 詞彙表大小
             "context_length": 1024,  # Context length
-            "emb_dim": 768,          # Embedding dimension
-            "n_heads": 12,           # Number of attention heads
-            "n_layers": 12,          # Number of layers
-            "drop_rate": 0.1,        # Dropout rate
-            "qkv_bias": False        # Query-key-value bias
+            "emb_dim": 768,          # Embedding 維度
+            "n_heads": 12,           # Attention head 數
+            "n_layers": 12,          # 層數
+            "drop_rate": 0.1,        # Dropout 比例
+            "qkv_bias": False        # Query-key-value 的 bias
         }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
