@@ -43,7 +43,12 @@ pkg/llms_from_scratch/      # 各章程式碼整理成的 Python 套件
 ## 環境設定
 
 ```bash
-# 1. 安裝 uv（macOS / Linux）
+# 1. 安裝 uv（macOS / Linux） 選一個
+#pip
+pip install uv
+#homebrew
+brew install uv
+#official
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. 下載 repo 並安裝套件
