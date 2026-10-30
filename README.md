@@ -1,6 +1,6 @@
 # My First LLM — 學習筆記
 
-這是我跟著《Build a Large Language Model (From Scratch)》從零實作 GPT 類 LLM 的個人學習 repo。
+這是我跟隨《Build a Large Language Model (From Scratch)》一書，從零開始實作 GPT 類大型語言模型（LLM）的個人學習 Repository。除了參考原書的程式碼與實作流程，我也加入了許多自己認為重要、但原始 Repository 未詳細說明的註解、概念解析與補充內容，透過實際動手與整理筆記，加深對 LLM 底層原理的理解。
 
 > **來源聲明**
 > 本 repo 的程式碼與教材內容皆來自 **Sebastian Raschka** 的著作與官方程式碼庫，著作權屬於原作者。
