@@ -14,8 +14,8 @@
 
 | 章節 | 主題 | 主程式 | 狀態 |
 |---|---|---|---|
-| Ch 1 | Understanding Large Language Models | 無程式碼 | ⬜ |
-| Ch 2 | Working with Text Data | [ch02](ch02/01_main-chapter-code) | ⬜ |
+| Ch 1 | Understanding Large Language Models | 無程式碼 | ✅ |
+| Ch 2 | Working with Text Data | [ch02](ch02/01_main-chapter-code) | ✅|
 | Ch 3 | Coding Attention Mechanisms | [ch03](ch03/01_main-chapter-code) | ⬜ |
 | Ch 4 | Implementing a GPT Model from Scratch | [ch04](ch04/01_main-chapter-code) | ⬜ |
 | Ch 5 | Pretraining on Unlabeled Data | [ch05](ch05/01_main-chapter-code) | ⬜ |
