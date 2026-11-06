@@ -8,7 +8,7 @@ import sys
 
 import tiktoken
 import torch
-import chainlit
+import chainlit #visualize
 
 # llms_from_scratch 的安裝說明請見：
 # https://github.com/rasbt/LLMs-from-scratch/tree/main/pkg
